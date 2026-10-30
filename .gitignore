@@ -1,0 +1,12 @@
+data/
+__pycache__/
+.DS_Store
+.venv/
+internal/
+archive/data/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.claude/settings.local.json
+.claude/context_ledger.md
+.claude/handoff/

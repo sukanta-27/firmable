@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv run mypy:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv run fastapi dev:*)"
+    ],
+    "deny": [
+      "Read(./data/raw/**)",
+      "Bash(cat data/raw/*)",
+      "Edit(./archive/**)",
+      "Write(./archive/**)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ruff.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
