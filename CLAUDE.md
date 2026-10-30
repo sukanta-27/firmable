@@ -13,6 +13,8 @@ Python 3.12, FastAPI, Pydantic v2, pydantic-settings, DuckDB over Parquet. Manag
 | Install / sync | `uv sync` |
 | Add a dependency | `uv add <pkg>` (dev: `uv add --dev <pkg>`) |
 | Bronze for one file | `DATA_ROOT=data/runs/sample uv run python -m pipeline bronze data/samples/stride400.jsonl` (add `--from cve_pass` to resume a failed run, `--force` to rebuild) |
+| PeeringDB snapshot (silver needs one) | `uv run python -m pipeline ref peeringdb` (writes `data/ref/peeringdb/as_of=<UTC date>/`) |
+| Silver for one file | `DATA_ROOT=data/runs/sample uv run python -m pipeline silver data/samples/stride400.jsonl` (same `--from <step>` and `--force`) |
 | Run the API | `uv run fastapi dev api/main.py` |
 | Tests | `uv run pytest` |
 | Lint + format | `uv run ruff check --fix . && uv run ruff format .` |

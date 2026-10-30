@@ -9,6 +9,7 @@ from pydantic import BaseModel
 class Status(StrEnum):
     RECEIVED = "received"
     BRONZE = "bronze"
+    SILVER = "silver"
     FAILED = "failed"
 
 
@@ -25,6 +26,9 @@ class Manifest(BaseModel):
     unreadable: int | None = None
     unknown_keys: dict[str, int] = {}
     error: str | None = None
+    silver_run_id: str | None = None
+    # git commit of the code that built silver, with "-dirty" when the tree had changes.
+    silver_code_version: str | None = None
 
 
 class Check(BaseModel):
@@ -45,6 +49,8 @@ class RunLog(BaseModel):
     peaks: dict[str, dict[str, float]] = {}
     rows: dict[str, int] = {}
     checks: list[Check] = []
+    refs: dict[str, str] = {}
+    metrics: dict[str, float] = {}
 
 
 def manifest_path(data_root: Path, file_id: str) -> Path:

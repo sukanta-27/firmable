@@ -3,10 +3,11 @@ import logging
 import sys
 from pathlib import Path
 
-from pipeline import bronze
+from pipeline import bronze, silver
 from pipeline.landing import LandingError, land
 from pipeline.meta import Manifest, Status, find_manifest, manifest_path, read_manifest, write_json
-from pipeline.settings import Settings
+from pipeline.ref import peeringdb
+from pipeline.settings import RefSettings, Settings
 
 logger = logging.getLogger("pipeline")
 
@@ -41,7 +42,7 @@ def run_bronze(source: Path, force: bool, start_at: str) -> int:
         return 1
 
     previous = read_manifest(settings.data_root, manifest.file_id)
-    if previous and previous.status == Status.BRONZE and not force:
+    if previous and previous.status in (Status.BRONZE, Status.SILVER) and not force:
         logger.info("already in bronze; pass --force to rebuild")
         return 0
     # Recorded before parsing, so a run that dies mid-parse still leaves the hash and count.
@@ -60,6 +61,46 @@ def run_bronze(source: Path, force: bool, start_at: str) -> int:
     return 0
 
 
+def run_silver(source: Path, force: bool, start_at: str) -> int:
+    """Build silver for one source file whose bronze tables exist."""
+    settings = Settings()
+    manifest = find_manifest(settings.data_root, source)
+    if manifest is None:
+        logger.error("no manifest for %s under %s; run bronze first", source, settings.data_root)
+        return 1
+    if manifest.status == Status.SILVER and not force:
+        logger.info("already in silver; pass --force to rebuild")
+        return 0
+    if manifest.status not in (Status.BRONZE, Status.SILVER):
+        logger.error("%s is at %s, not bronze; run bronze first", source, manifest.status)
+        return 1
+
+    log = silver.build(manifest, settings, start_at)
+    for c in log.checks:
+        mark = "ok  " if c.passed else ("FAIL" if c.blocking else "warn")
+        logger.info("%s %s: %s", mark, c.name, c.detail)
+    logger.info("rows %s", log.rows)
+    logger.info("refs %s", log.refs)
+    for name, value in sorted(log.metrics.items()):
+        logger.info("metric %s = %s", name, f"{value:,.0f}")
+    logger.info("seconds %s", {k: round(v, 1) for k, v in log.seconds.items()})
+    final = read_manifest(settings.data_root, manifest.file_id)
+    if final is None or final.status != Status.SILVER:
+        logger.error("silver failed: %s", final.error if final else "no manifest")
+        return 1
+    return 0
+
+
+def run_ref_peeringdb() -> int:
+    try:
+        target, n = peeringdb.fetch(RefSettings().ref_root)
+    except (OSError, ValueError, peeringdb.SnapshotError) as e:
+        logger.error("peeringdb snapshot failed: %s", e)
+        return 1
+    logger.info("peeringdb: %s networks written to %s", f"{n:,}", target)
+    return 0
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", stream=sys.stdout)
     parser = argparse.ArgumentParser(prog="pipeline")
@@ -74,7 +115,23 @@ def main() -> int:
         default=bronze.STEP_NAMES[0],
         help="resume a failed run at this step, reusing the outputs of the steps before it",
     )
+    s = sub.add_parser("silver", help="build the silver tables for a file already in bronze")
+    s.add_argument("source", type=Path)
+    s.add_argument("--force", action="store_true", help="rebuild even if already in silver")
+    s.add_argument(
+        "--from",
+        dest="start_at",
+        choices=silver.STEP_NAMES,
+        default=silver.STEP_NAMES[0],
+        help="resume a failed run at this step, reusing the outputs of the steps before it",
+    )
+    r = sub.add_parser("ref", help="fetch a reference snapshot")
+    r.add_argument("source", choices=["peeringdb"])
     args = parser.parse_args()
+    if args.step == "ref":
+        return run_ref_peeringdb()
+    if args.step == "silver":
+        return run_silver(args.source, args.force, args.start_at)
     return run_bronze(args.source, args.force, args.start_at)
 
 
