@@ -44,4 +44,4 @@ uv venv .venv && uv pip install -p .venv/bin/python duckdb
 .venv/bin/python -I archive/scripts/analysis/q.py archive/scripts/analysis/00_overview.sql
 ```
 
-`archive/scripts/analysis/q.py` runs any SQL file or string against the Parquet. It loads `archive/scripts/analysis/views.sql` first, which defines the owner bucket, the signal booleans and the hand-label tables in `reference/labels/`. Files are numbered in the order they must run; `05_attribution.sql` writes `archive/data/work/attr.parquet` that `06` and `07` read.
+`archive/scripts/analysis/q.py` runs any SQL file or string against the Parquet. It loads `archive/scripts/analysis/views.sql` first, which defines the owner bucket, the signal booleans and the label tables in `archive/labels/` (drafted by an earlier Claude session, not checked by a person). Files are numbered in the order they must run; `05_attribution.sql` writes `archive/data/work/attr.parquet` that `06` and `07` read.

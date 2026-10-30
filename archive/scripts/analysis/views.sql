@@ -10,11 +10,11 @@ SELECT *,
        coalesce(ip_str, ipv6) AS ip
 FROM banners;
 
--- Hand labels. Org labels match on the first 48 characters because the labelling
+-- Label lists drafted by an earlier Claude session, never checked by a person. Org labels match on the first 48 characters because the labelling
 -- sheet truncated long names there.
-CREATE TABLE org_lbl  AS SELECT DISTINCT left(org, 48) AS k, class FROM read_csv('reference/labels/org_class.csv', header=true);
-CREATE TABLE dom_lbl  AS SELECT domain, class FROM read_csv('reference/labels/domain_class.csv', header=true);
-CREATE TABLE cert_lbl AS SELECT o, class FROM read_csv('reference/labels/cert_o_class.csv', header=true);
+CREATE TABLE org_lbl  AS SELECT DISTINCT left(org, 48) AS k, class FROM read_csv('archive/labels/org_class.csv', header=true);
+CREATE TABLE dom_lbl  AS SELECT domain, class FROM read_csv('archive/labels/domain_class.csv', header=true);
+CREATE TABLE cert_lbl AS SELECT o, class FROM read_csv('archive/labels/cert_o_class.csv', header=true);
 
 -- CISA Known Exploited Vulnerabilities catalog (data/external/kev.json).
 CREATE VIEW kev AS

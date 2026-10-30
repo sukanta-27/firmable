@@ -2,7 +2,6 @@
 
 Everything here was written to explore the 2026-10-26 Shodan file before the application was designed. None of it is part of the application or its pipeline. It is kept because the numbers in `docs/` were produced by these scripts and can be reproduced with them.
 
-The hand-labelled tables these scripts read now live in `reference/labels/`, because the application pipeline uses them too.
 
 | Path | What it is |
 |---|---|

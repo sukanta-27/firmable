@@ -49,7 +49,7 @@ Every record field the analysis used, plus the 163 protocol-specific objects Sho
 
 ### Shape for production
 
-One file arrives, one `flatten_duckdb.py` run, one Parquet partition. Labels and rules (`reference/labels/*.csv`, `views.sql`) are tables, so re-scoring is a query, not a re-parse. A 114 GiB file is 72 s of CPU, so hundreds of files a month is hours, not days.
+One file arrives, one `flatten_duckdb.py` run, one Parquet partition. Labels and rules (`archive/labels/*.csv`, `views.sql`) are tables, so re-scoring is a query, not a re-parse. A 114 GiB file is 72 s of CPU, so hundreds of files a month is hours, not days.
 
 ### Reproduce
 
@@ -100,7 +100,7 @@ Even inside `other`, 2,230 IPs with more than 50 records hold 337,603 records. E
 
 ### Owner class of the `other` bucket (`05_attribution.sql`)
 
-Each org string was classified. The top 600 org strings were labelled by hand (`labels/org_class.csv`, 74% of `other` records); the remaining 82,000 org strings fall through keyword rules.
+Each org string was classified. The top 600 org strings were labelled by the Claude session that wrote this analysis, not checked by a person (`archive/labels/org_class.csv`, 74% of `other` records); the remaining 82,000 org strings fall through keyword rules.
 
 | Owner class | Records | IPs | Distinct orgs | What it means for attribution |
 |---|---|---|---|---|
@@ -142,7 +142,7 @@ Precision was judged from `05b_handcheck.sql` (25 records per route, determinist
 
 ### What "infrastructure domain" means
 
-An `infra_dom` table of 7,012 domains is excluded from the `domain` and `sni` routes. It holds 6,687 reverse-DNS domains, detected because at least half their hostnames contain an IP-like digit pattern (`179-125-1-1.embratel.net.br`), 257 hand labels (`labels/domain_class.csv`), and the dominant domain of any ISP or hoster org. Two regex lists are excluded on top: dynamic-DNS providers and hosting keywords (`host`, `cloud`, `vps`, `^as\d+\.`, `^ip-\d+`). The remaining domain-route errors in the hand-check are small ISPs and hosters whose names carry no such token (`e-kei.pl`, `melsa.net.id`, `troianet.com.br`).
+An `infra_dom` table of 7,012 domains is excluded from the `domain` and `sni` routes. It holds 6,687 reverse-DNS domains, detected because at least half their hostnames contain an IP-like digit pattern (`179-125-1-1.embratel.net.br`), 257 AI-drafted labels (`archive/labels/domain_class.csv`), and the dominant domain of any ISP or hoster org. Two regex lists are excluded on top: dynamic-DNS providers and hosting keywords (`host`, `cloud`, `vps`, `^as\d+\.`, `^ip-\d+`). The remaining domain-route errors in the hand-check are small ISPs and hosters whose names carry no such token (`e-kei.pl`, `melsa.net.id`, `troianet.com.br`).
 
 ### Coverage
 

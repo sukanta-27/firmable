@@ -30,7 +30,6 @@ Before saying work is done: `ruff check`, `mypy` and `pytest` pass, and you ran 
 | `api/` | FastAPI app. Reads gold Parquet through DuckDB, read-only | Thin: query, validate, return |
 | `web/` | React + Vite frontend, built into static files that `api/` serves | |
 | `tests/` | Tests | See "Tests" below |
-| `reference/labels/*.csv` | Hand labels for orgs, cert subjects, domains | Shared input to the pipeline and to the numbers in `docs/`. A change here changes those numbers; say so |
 | `docs/` | Findings, each number traceable to a script | Amend in place when wrong; never add a contradicting doc beside it |
 | `archive/` | Frozen exploration scripts that reproduce the numbers in `docs/` | **Read-only.** Never import from it. Copy what you need into `pipeline/` |
 | `data/` | Raw dump, samples, external feeds (KEV, EPSS). Git-ignored | See "Data" below |
@@ -111,17 +110,19 @@ Each was a plausible rule the data disproved. Evidence and counts: `docs/eda/pat
 | Honeypot-tagged records | Dropped from every signal |
 | `_shodan.module` (probe name) | Not the service. Use `product` and protocol objects |
 | `org` / `isp` | Usually the hoster or carrier, not the company. Classify the owner first, then attribute |
-| Hostname domain | Often ISP reverse DNS. Filter infrastructure domains (`reference/labels/domain_class.csv`) |
+| Hostname domain | Often ISP reverse DNS. Filter infrastructure domains computed from the file: IP-like hostnames (`179-125-1-1.provider.net`) and the dominant domain of ISP and hosting networks |
 | DuckDB `count_if`, `least` | `count_if` gives NULL on all-NULL input; `least(NULL, 3)` is 3. Use `count(*) FILTER (WHERE …)` |
 | Signals in general | Roll up from record to company. Collapse correlated evidence (an EOL nginx and its version CVEs are one fact) |
 
-A new signal states its definition as code, its prevalence, its attributable coverage and a hand-checked precision before it enters a score.
+A new signal states its definition as code, its prevalence and its attributable coverage before it enters a score.
+
+**No one labels or hand-checks data on an ongoing basis.** Never design a rule, check or metric that needs a person to label, and never add a static list drafted by an LLM as pipeline input. Classifications come from a named, dated source (scanner tags, PeeringDB, the Public Suffix List) or a rule computed from the data, and the run log reports what each one covered.
 
 ## LLM use
 
 - Label **distinct values** (org strings, domains, titles), never raw records. Cache by `(strategy, model, input hash)`, so cost grows with new values, not with volume.
 - Validate every response against a Pydantic model; anything that fails validation is recorded as unlabelled, never guessed.
-- Before an LLM labeller is used, measure its agreement with the hand labels in `reference/labels/`. Record the agreement rate, and the tokens and cost per 1,000 items.
+- Before an LLM labeller is used, measure its agreement with an independent source (for network types, PeeringDB). Record the agreement rate, and the tokens and cost per 1,000 items.
 - Model id, prompt and provider come from settings, behind the rule 3 registry.
 
 ## Tests
