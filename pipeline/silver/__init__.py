@@ -1,4 +1,4 @@
-"""Silver: sightings folded into services, who owns each address, and every clue and CVE.
+"""Silver: sightings folded into services, who owns each address, every clue, CVE and finding.
 
 Only `service` is deduplicated. The other tables keep one row per sighting, so a finding
 seen once is never lost to dedupe.
@@ -16,7 +16,7 @@ from pipeline import stage
 from pipeline.meta import Check, Manifest, RunLog, Status, manifest_path, write_json
 from pipeline.ref import peeringdb
 from pipeline.settings import Settings
-from pipeline.silver import address, checks, identity, service, sightings, vuln
+from pipeline.silver import address, checks, identity, service, sightings, signal, vuln
 
 STEPS: list[tuple[str, stage.Step[Settings], tuple[str, ...]]] = [
     ("sightings", sightings.build, ("sightings",)),
@@ -25,6 +25,7 @@ STEPS: list[tuple[str, stage.Step[Settings], tuple[str, ...]]] = [
     ("identity_candidates", identity.candidates, ("identity_candidates",)),
     ("identity_evidence", identity.evidence, ("identity_evidence",)),
     ("service_vuln", vuln.build, ("service_vuln",)),
+    ("service_signal", signal.build, ("service_signal",)),
 ]
 STEP_NAMES = [name for name, _, _ in STEPS]
 UNPUBLISHED = ("sightings", "identity_candidates")

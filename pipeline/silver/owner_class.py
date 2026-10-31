@@ -1,7 +1,9 @@
 """Who owns an address: the business itself, or a landlord whose customers are the businesses.
 
-Order: the scanner's own `cdn` and `cloud` tags, then the network's self-declared PeeringDB
-type, else `unknown`. Every input is a dated public source; nothing here is a hand list.
+Order: the scanner's own `cdn` and `cloud` tags; then `cloud` for an address on an ASN whose
+addresses mostly carry the `cloud` tag, because a landlord may declare itself a business in
+PeeringDB; then the network's self-declared PeeringDB type, else `unknown`. Every input is a
+dated public source or a rule computed from the file; nothing here is a hand list.
 """
 
 # A network may declare several PeeringDB types. Attribution only needs "business or

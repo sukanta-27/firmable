@@ -1,11 +1,14 @@
 """Steps 4 and 5: clues to which business a service belongs to, one row per sighting x clue.
 
-Two routes, named for where the name came from:
+Routes, named for where the name came from:
 - scan_hostname: the website name the scanner asked for.
 - dns_hostname: an entry of Shodan's `hostnames[]`. Not only reverse DNS: when a sighting
   has a scan hostname, `hostnames[]` contained it on 737,413 of 737,690 such records
   (2026-10-26 file). Those echoes are dropped here, so one clue never counts as two routes
   agreeing.
+- ntlm_dns_name, ldap_dns_name: the Windows domain or directory name the server reports about
+  itself. These are the only clue on a company range whose addresses have no hostname.
+  `.local` names and bare machine names have no public suffix, so they never get a domain.
 
 A name under a platform suffix from the Public Suffix List's private section (cloudfront.net,
 cloudapp.net, cdn.cloudflare.net) names the platform, not a business, so it is infrastructure.
@@ -63,6 +66,10 @@ def candidates(con: duckdb.DuckDBPyConnection, _: Settings, staging: Path) -> No
         SELECT hostname FROM {sightings} WHERE hostname IS NOT NULL
         UNION
         SELECT unnest(hostnames) FROM {sightings}
+        UNION
+        SELECT unnest(ntlm_names) FROM {sightings}
+        UNION
+        SELECT unnest(ldap_names) FROM {sightings}
         """
     )
     with names.open("w") as out:
@@ -89,6 +96,12 @@ def candidates(con: duckdb.DuckDBPyConnection, _: Settings, staging: Path) -> No
             FROM {sightings}
           )
           WHERE raw_value IS DISTINCT FROM hostname
+          UNION ALL
+          SELECT service_key, rec_id, seen_at, ip, 'ntlm_dns_name', unnest(ntlm_names)
+          FROM {sightings}
+          UNION ALL
+          SELECT service_key, rec_id, seen_at, ip, 'ldap_dns_name', unnest(ldap_names)
+          FROM {sightings}
         ),
         names AS (
           SELECT * FROM read_json('{names}',
@@ -107,9 +120,13 @@ def evidence(con: duckdb.DuckDBPyConnection, settings: Settings, staging: Path) 
 
     ip_number_name: a domain on enough addresses whose names are mostly IP numbers
     (179-125-1-1.provider.net). network_main_domain: a domain making up a large share of the
-    names on one ISP, hosting or CDN network. Thresholds come from the archived analysis, which
-    grouped networks by org rather than ASN, and were not re-tested. platform_domain: a name
-    under a platform suffix with no real domain embedded before it.
+    names on one ISP, hosting, cloud or CDN network. Thresholds come from the archived
+    analysis, which grouped networks by org rather than ASN, and were not re-tested.
+    The share is counted separately for addresses the scanner tagged and the rest of the
+    network: on Microsoft's AS8075 (2026-10-26 file) the tagged addresses are customer machines
+    with thousands of names, and pooling them sank office.com, outlook.com and 7 other
+    Microsoft domains under the share, turning 7,436 rows into business clues.
+    platform_domain: a name under a platform suffix with no real domain embedded before it.
     """
     cands = stage.read(staging, "identity_candidates")
     (staging / "identity_evidence").mkdir()
@@ -127,21 +144,22 @@ def evidence(con: duckdb.DuckDBPyConnection, settings: Settings, staging: Path) 
                 >= {settings.ip_number_min_share} * count(DISTINCT raw_value)
         ),
         landlord_ev AS (
-          SELECT a.asn, ev.rec_id, ev.normalized_value
+          SELECT a.asn, a.owner_class_source AS source, ev.rec_id, ev.normalized_value
           FROM ev JOIN {stage.read(staging, "address")} a USING (ip)
-          WHERE a.owner_class IN ('isp', 'hosting', 'cdn') AND a.asn IS NOT NULL
+          WHERE a.owner_class IN ('isp', 'hosting', 'cloud', 'cdn') AND a.asn IS NOT NULL
         ),
-        per_asn AS (
-          SELECT asn, count(DISTINCT rec_id) AS records FROM landlord_ev GROUP BY asn
+        per_network AS (
+          SELECT asn, source, count(DISTINCT rec_id) AS records
+          FROM landlord_ev GROUP BY asn, source
         ),
         network_main AS (
           SELECT DISTINCT normalized_value
           FROM (
-            SELECT asn, normalized_value, count(DISTINCT rec_id) AS records
-            FROM landlord_ev GROUP BY asn, normalized_value
-          ) d JOIN per_asn USING (asn)
+            SELECT asn, source, normalized_value, count(DISTINCT rec_id) AS records
+            FROM landlord_ev GROUP BY asn, source, normalized_value
+          ) d JOIN per_network USING (asn, source)
           WHERE d.records >= {settings.network_domain_min_records}
-            AND d.records >= {settings.network_domain_min_share} * per_asn.records
+            AND d.records >= {settings.network_domain_min_share} * per_network.records
         )
         SELECT ev.service_key, ev.rec_id, ev.seen_at, ev.evidence_type, ev.raw_value,
           ev.normalized_value,

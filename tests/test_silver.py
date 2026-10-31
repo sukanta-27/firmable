@@ -14,6 +14,24 @@ RECORDS = (Path(__file__).parent / "fixtures" / "records.jsonl").read_text().spl
 NGINX = next(r for r in RECORDS if '"d767b4f6' in r)
 WITH_CVES = next(r for r in RECORDS if '"cfb933d2' in r)
 UNTAGGED = next(r for r in RECORDS if '"633ccbc2' in r)
+SIGNAL_RECORDS = (
+    (Path(__file__).parent / "fixtures" / "signal_records.jsonl").read_text().splitlines()
+)
+NTLM = next(r for r in SIGNAL_RECORDS if '"889b057f' in r)
+RDP = next(r for r in SIGNAL_RECORDS if '"51215953' in r)
+SMB_IPC_ONLY = next(r for r in SIGNAL_RECORDS if '"349f62ae' in r)
+FTP_ANONYMOUS = next(r for r in SIGNAL_RECORDS if '"d27145be' in r)
+MYSQL_REFUSING = next(r for r in SIGNAL_RECORDS if '"2aec7dfa' in r)
+VNC = next(r for r in SIGNAL_RECORDS if '"2b111c5a' in r)
+# From the full 2026-10-26 file (the sample has no Lantronix record); its MAC is on one IP there.
+LANTRONIX = {
+    "type": "X90",
+    "version": "6.10.0.1",
+    "mac": "00:0A:00:17:6D:01",
+    "ip": "75.99.22.110",
+    "gateway": "75.99.22.105",
+    "password": "5640",
+}
 
 
 def variant(line: str, n: int, **changes: Any) -> str:
@@ -24,7 +42,10 @@ def variant(line: str, n: int, **changes: Any) -> str:
 
 
 def run(
-    root: Path, lines: list[str], networks: list[tuple[str, list[str]]] | None = None
+    root: Path,
+    lines: list[str],
+    networks: list[tuple[str, list[str]]] | None = None,
+    **settings_overrides: Any,
 ) -> Manifest:
     """Land, bronze and silver a source file under `root`, with a tiny PeeringDB snapshot."""
     root.mkdir(parents=True, exist_ok=True)
@@ -39,7 +60,7 @@ def run(
     source = root / "source.jsonl"
     source.write_text("\n".join(lines) + "\n")
     landed = land(source)
-    settings = Settings(data_root=root / "data", ref_root=root / "ref")
+    settings = Settings(data_root=root / "data", ref_root=root / "ref", **settings_overrides)
     bronze.build(landed, settings.data_root, max_empty_share=0.01)
     in_bronze = read_manifest(settings.data_root, landed.file_id)
     assert in_bronze is not None and in_bronze.status == Status.BRONZE
@@ -131,3 +152,133 @@ def test_network_with_several_peeringdb_types_takes_the_landlord_class(tmp_path:
     assert table(tmp_path, "address", "owner_class, owner_class_source", f"ip = '{ip}'") == [
         ("hosting", "peeringdb")
     ]
+
+
+def test_mostly_cloud_network_is_cloud_but_one_cloud_address_does_not_flip_a_business(
+    tmp_path: Path,
+) -> None:
+    cloud_net = json.loads(UNTAGGED)["asn"]
+    business_net = "AS64500"
+    lines = [
+        *RECORDS,
+        variant(UNTAGGED, 1, ip_str="198.51.100.1", tags=["cloud"]),
+        variant(UNTAGGED, 2, ip_str="198.51.100.2", tags=["cloud"]),
+        *(variant(UNTAGGED, n, ip_str=f"203.0.113.{n}", asn=business_net) for n in (3, 4, 5)),
+        variant(UNTAGGED, 6, ip_str="203.0.113.6", asn=business_net, tags=["cloud"]),
+    ]
+    networks = [(cloud_net, ["Enterprise"]), (business_net, ["Enterprise"])]
+    run(tmp_path, lines, networks, asn_cloud_min_addresses=3, asn_cloud_min_share=0.5)
+
+    untagged_ip = json.loads(UNTAGGED)["ip_str"]
+    columns = "owner_class, owner_class_source"
+    assert table(tmp_path, "address", columns, f"ip = '{untagged_ip}'") == [
+        ("cloud", "asn_cloud_share")
+    ]
+    assert (
+        table(tmp_path, "address", columns, "ip IN ('203.0.113.3', '203.0.113.4', '203.0.113.5')")
+        == [("enterprise", "peeringdb")] * 3
+    )
+
+
+def test_ntlm_forest_name_is_a_clue_and_a_local_name_is_not(tmp_path: Path) -> None:
+    local_names = {"dns_forest_name": "corp.local", "dns_domain_name": "corp.local"}
+    ntlm = {**json.loads(NTLM)["ntlm"], **local_names, "fqdn": "PAD-01.corp.local"}
+    local = variant(NTLM, 1, ip_str="198.51.100.9", ntlm=ntlm)
+    run(tmp_path, [*RECORDS, NTLM, local])
+    assert table(
+        tmp_path,
+        "identity_evidence",
+        "DISTINCT rec_id, normalized_value, is_infrastructure",
+        "evidence_type = 'ntlm_dns_name'",
+    ) == [(json.loads(NTLM)["_shodan"]["id"], "pragerberckhoff.com", False)]
+
+
+def rec_id(line: str) -> str:
+    return str(json.loads(line)["_shodan"]["id"])
+
+
+def test_signal_seen_in_one_sighting_survives_dedupe(tmp_path: Path) -> None:
+    later = variant(
+        RDP, 1, timestamp="2026-10-26T23:00:00.000000", rdp_encryption=None, product=None, data="x"
+    )
+    run(tmp_path, [*RECORDS, RDP, later])
+    (key,) = table(tmp_path, "service", "service_key", "sightings = 2")[0]
+    assert table(tmp_path, "service_signal", "rec_id, signal_code", f"service_key = '{key}'") == [
+        (rec_id(RDP), "rdp_exposed"),
+        (rec_id(RDP), "rdp_standard_security"),
+    ]
+
+
+def test_no_signal_on_honeypot_or_cdn_services(tmp_path: Path) -> None:
+    honeypot = variant(RDP, 1, ip_str="198.51.100.11", tags=["honeypot"])
+    cdn = json.loads(variant(RDP, 2, ip_str="198.51.100.12", tags=["cdn"]))
+    cdn["_shodan"]["options"] = {"hostname": "remote.example.com"}
+    run(tmp_path, [*RECORDS, RDP, honeypot, json.dumps(cdn)])
+    assert table(tmp_path, "service_signal", "DISTINCT rec_id") == [(rec_id(RDP),)]
+
+
+def test_rules_match_only_what_the_reply_proves(tmp_path: Path) -> None:
+    no_auth = {**json.loads(VNC)["vnc"], "security_types": {"1": "None"}}
+    vnc_no_product = variant(VNC, 1, ip_str="198.51.100.21", vnc=no_auth, product=None)
+    vnc_fictus = variant(VNC, 2, ip_str="198.51.100.22", vnc=no_auth, product="FictusVNC")
+    lantronix = {"port": 30718, "transport": "udp", "lantronix": LANTRONIX}
+    cloned = [variant(UNTAGGED, n, ip_str=f"198.51.100.{n + 30}", **lantronix) for n in (3, 4)]
+    unique_mac = {**LANTRONIX, "mac": "00:0A:00:17:6D:02"}
+    unique = variant(UNTAGGED, 5, ip_str="198.51.100.35", **{**lantronix, "lantronix": unique_mac})
+    lines = [FTP_ANONYMOUS, SMB_IPC_ONLY, MYSQL_REFUSING, vnc_no_product, vnc_fictus, *cloned]
+    run(tmp_path, [*RECORDS, *lines, unique])
+
+    codes = ("ftp_anonymous", "smb_anonymous", "tag_database", "vnc_noauth", "lantronix_password")
+    assert set(
+        table(tmp_path, "service_signal", "rec_id, signal_code", f"signal_code IN {codes}")
+    ) == {
+        (rec_id(FTP_ANONYMOUS), "ftp_anonymous"),
+        (rec_id(vnc_no_product), "vnc_noauth"),
+        (rec_id(unique), "lantronix_password"),
+    }
+
+
+def test_provider_domain_stays_infrastructure_when_the_network_turns_cloud(
+    tmp_path: Path,
+) -> None:
+    # The AS8075 case on the full 2026-10-26 file: once G1 made the network cloud, its many
+    # tagged customer machines diluted office.com below the share and it became a business.
+    net = "AS64501"
+    customers = [
+        variant(
+            UNTAGGED,
+            n,
+            ip_str=f"198.51.100.{n}",
+            asn=net,
+            tags=["cloud"],
+            hostnames=[f"app.customer{n}.com"],
+        )
+        for n in range(1, 9)
+    ]
+    own = [
+        variant(UNTAGGED, n, ip_str=f"203.0.113.{n}", asn=net, hostnames=["mail.office.com"])
+        for n in (9, 10)
+    ]
+    run(
+        tmp_path,
+        [*RECORDS, *customers, *own],
+        [(net, ["Content"])],
+        asn_cloud_min_addresses=3,
+        network_domain_min_records=2,
+    )
+    assert table(
+        tmp_path,
+        "identity_evidence",
+        "DISTINCT is_infrastructure, infra_reason",
+        "normalized_value = 'office.com'",
+    ) == [(True, "network_main_domain")]
+
+
+def test_ransom_page_in_any_case_shows_the_note_as_evidence(tmp_path: Path) -> None:
+    # A blank excerpt fails the file's blocking evidence check, so this case must not blank it.
+    note = "Your database was backed up. To Recover Your Files send 0.1 BTC to the address below"
+    page = variant(UNTAGGED, 1, ip_str="198.51.100.41", data=note)
+    run(tmp_path, [*RECORDS, page])
+    assert table(
+        tmp_path, "service_signal", "evidence_field, evidence_text", "signal_code = 'ransom_note'"
+    ) == [("data", "Recover Your Files send 0.1 BTC to the address below")]

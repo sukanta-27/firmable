@@ -6,6 +6,7 @@ import duckdb
 from pipeline import stage
 from pipeline.meta import Check
 from pipeline.silver.owner_class import MAPPED_TYPES
+from pipeline.silver.signal_rules import RULES
 
 IPV4 = r"^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$"
 
@@ -55,7 +56,17 @@ def run(
             t("identity_evidence"), "service_key", t("service")
         ),
         "service_vuln.service_key": missing(t("service_vuln"), "service_key", t("service")),
+        "service_signal.rec_id": missing(t("service_signal"), "rec_id", readable_bronze),
+        "service_signal.service_key": missing(t("service_signal"), "service_key", t("service")),
     }
+    on_noise, no_evidence, unknown_code = one(
+        f"SELECT count(*) FILTER (WHERE sv.noise_reason IS NOT NULL OR a.owner_class = 'cdn'), "
+        "count(*) FILTER (WHERE coalesce(g.evidence_text, '') = ''), "
+        f"count(*) FILTER (WHERE g.signal_code IS NULL OR NOT list_contains({list(RULES)}, "
+        f"g.signal_code)) FROM {t('service_signal')} g "
+        f"LEFT JOIN {t('service')} sv USING (service_key) "
+        f"LEFT JOIN {t('address')} a ON a.ip = sv.ip"
+    )
     unmapped = [
         r[0]
         for r in con.execute(
@@ -123,6 +134,24 @@ def run(
             detail=", ".join(f"{k} {v} unmatched" for k, v in orphan.items()),
         ),
         Check(
+            name="signal_skips_noise_and_cdn",
+            blocking=True,
+            passed=on_noise == 0,
+            detail=f"{on_noise} service_signal rows on a noise service or a cdn address",
+        ),
+        Check(
+            name="signal_evidence_present",
+            blocking=True,
+            passed=no_evidence == 0,
+            detail=f"{no_evidence} service_signal rows with no evidence_text",
+        ),
+        Check(
+            name="signal_codes_known",
+            blocking=True,
+            passed=unknown_code == 0,
+            detail=f"{unknown_code} service_signal rows with a code not in the rule catalogue",
+        ),
+        Check(
             name="peeringdb_types_mapped",
             blocking=False,
             passed=not unmapped,
@@ -182,6 +211,64 @@ def _metrics(con: duckdb.DuckDBPyConnection, staging: Path) -> dict[str, float]:
     ).fetchone()
     assert gap is not None
     metrics["known_gap.addresses"], metrics["known_gap.records"] = float(gap[0]), float(gap[1])
+    metrics["asn_cloud_share.asns"] = float(
+        con.execute(
+            f"SELECT count(DISTINCT asn) FROM {t('address')} "
+            "WHERE owner_class_source = 'asn_cloud_share'"
+        ).fetchall()[0][0]
+    )
+    # G1 moves whole ASNs, so a company's own block on a cloud ASN becomes cloud and leaves the
+    # known gap without being attributed. An org never seen on a scanner-tagged address of the
+    # same ASN is the visible upper bound; it also counts the provider's own org names.
+    metrics["asn_cloud_share.org_unseen_on_tagged"] = float(
+        con.execute(
+            f"""
+            SELECT count(*) FROM {t("address")} m
+            WHERE owner_class_source = 'asn_cloud_share' AND NOT EXISTS (
+              SELECT 1 FROM {t("address")} x
+              WHERE x.owner_class_source = 'scanner_tag' AND x.owner_class = 'cloud'
+                AND x.asn = m.asn AND x.org IS NOT DISTINCT FROM m.org)
+            """
+        ).fetchall()[0][0]
+    )
+    signals = t("service_signal")
+    metrics |= pairs(f"SELECT signal_code, count(*) FROM {signals} GROUP BY 1", "signals.rows")
+    metrics |= pairs(
+        f"SELECT signal_code, count(DISTINCT service_key) FROM {signals} GROUP BY 1",
+        "signals.services",
+    )
+    metrics |= pairs(
+        f"""
+        SELECT g.signal_code, count(DISTINCT g.service_key)
+        FROM {signals} g JOIN {t("service")} sv USING (service_key) JOIN {t("address")} a
+          ON a.ip = sv.ip
+        WHERE a.owner_class IN ('enterprise', 'edu', 'gov') OR g.service_key IN (
+          SELECT service_key FROM {t("identity_evidence")} WHERE NOT is_infrastructure)
+        GROUP BY 1
+        """,
+        "signals.attributable_services",
+    )
+    # What the NTLM and LDAP routes add: services on a business or unknown address whose only
+    # business clue is a name the server reports about itself. Decides whether they stay.
+    first_clue = con.execute(
+        f"""
+        WITH clue AS (
+          SELECT service_key,
+            bool_or(evidence_type IN ('ntlm_dns_name', 'ldap_dns_name')) AS from_reply,
+            bool_or(evidence_type NOT IN ('ntlm_dns_name', 'ldap_dns_name')) AS from_other
+          FROM {t("identity_evidence")}
+          WHERE NOT is_infrastructure
+          GROUP BY service_key
+        )
+        SELECT count(*), count(DISTINCT s.ip)
+        FROM clue JOIN {t("service")} s USING (service_key) JOIN {t("address")} a USING (ip)
+        WHERE from_reply AND NOT from_other
+          AND a.owner_class IN ('unknown', 'enterprise', 'edu', 'gov')
+        """
+    ).fetchone()
+    assert first_clue is not None
+    metrics["reply_names_first_clue.services"] = float(first_clue[0])
+    metrics["reply_names_first_clue.addresses"] = float(first_clue[1])
     metrics |= pairs(
         f"SELECT evidence_type, count(*) FROM {t('identity_evidence')} GROUP BY 1",
         "evidence_by_type",

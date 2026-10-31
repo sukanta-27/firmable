@@ -29,6 +29,15 @@ def build(con: duckdb.DuckDBPyConnection, settings: Settings, staging: Path) -> 
           FROM {stage.read(staging, "sightings")}
           GROUP BY ip
         ),
+        cloud_asn AS (
+          SELECT latest.asn AS asn
+          FROM per_ip
+          WHERE latest.asn IS NOT NULL
+          GROUP BY latest.asn
+          HAVING count(*) >= {settings.asn_cloud_min_addresses}
+            AND count(*) FILTER (WHERE cloud AND NOT cdn) / count(*)
+              >= {settings.asn_cloud_min_share}
+        ),
         net AS (
           SELECT asn, {peeringdb_class_sql("info_types")} AS cls,
             nullif(array_to_string(info_types, '|'), '') AS types
@@ -36,15 +45,19 @@ def build(con: duckdb.DuckDBPyConnection, settings: Settings, staging: Path) -> 
         )
         SELECT ip, latest.v AS ip_version, latest.asn AS asn, latest.org AS org,
           latest.isp AS isp, latest.cc AS country_code,
-          CASE WHEN cdn THEN 'cdn' WHEN cloud THEN 'cloud' ELSE coalesce(net.cls, 'unknown')
-          END AS owner_class,
+          CASE WHEN cdn THEN 'cdn' WHEN cloud OR cloud_asn.asn IS NOT NULL THEN 'cloud'
+            ELSE coalesce(net.cls, 'unknown') END AS owner_class,
           CASE WHEN cdn OR cloud THEN 'scanner_tag'
+            WHEN cloud_asn.asn IS NOT NULL THEN 'asn_cloud_share'
             WHEN net.cls <> 'unknown' THEN 'peeringdb' ELSE 'none' END AS owner_class_source,
-          CASE WHEN cdn THEN 'cdn' WHEN cloud THEN 'cloud' ELSE net.types END
+          CASE WHEN cdn THEN 'cdn' WHEN cloud THEN 'cloud'
+            WHEN cloud_asn.asn IS NOT NULL THEN 'asn_cloud_share' ELSE net.types END
             AS owner_class_detail,
           is_honeypot, ports,
           ports > {settings.answers_everything_ports} AS answers_everything
-        FROM per_ip LEFT JOIN net ON net.asn = latest.asn
+        FROM per_ip
+        LEFT JOIN cloud_asn ON cloud_asn.asn = latest.asn
+        LEFT JOIN net ON net.asn = latest.asn
         """,
         staging / "address" / "data.parquet",
     )

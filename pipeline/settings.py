@@ -23,3 +23,9 @@ class Settings(RefSettings):
     ip_number_min_share: float = 0.5
     network_domain_min_records: int = 50
     network_domain_min_share: float = 0.3
+    # An ASN whose addresses are mostly tagged cloud (not cdn) is a cloud landlord even where
+    # the scanner left an address untagged. Assumed cut-offs: on the 2026-10-26 file only 4
+    # ASNs with 100+ addresses have a share between 10% and 50%, so any cut in that band
+    # moves only those.
+    asn_cloud_min_share: float = 0.5
+    asn_cloud_min_addresses: int = 100
