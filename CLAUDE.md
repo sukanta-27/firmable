@@ -62,7 +62,7 @@ Before saying work is done: `ruff check`, `mypy` and `pytest` pass, and you ran 
 
 The code says *what*. A comment earns its place only by saying *why*:
 
-- A data fact behind a rule: `# telnet object also appears on SSH and VNC banners; require port 23/2323 or a login prompt`
+- A data fact behind a rule: `# hostnames[] repeats the scan hostname on almost every record; drop the echo or one clue counts as two routes agreeing`
 - An alternative rejected, and the reason
 - A trap the signature can't show: `# count_if returns NULL, not 0, when every input is NULL`
 - A workaround, its cause, and what retires it
@@ -118,7 +118,16 @@ Each was a plausible rule the data disproved. Evidence and counts: `docs/eda/pat
 
 A new signal states its definition as code, its prevalence and its attributable coverage before it enters a score.
 
-**No one labels or hand-checks data on an ongoing basis.** Never design a rule, check or metric that needs a person to label, and never add a static list drafted by an LLM as pipeline input. Classifications come from a named, dated source (scanner tags, PeeringDB, the Public Suffix List) or a rule computed from the data, and the run log reports what each one covered.
+**No one labels or hand-checks data on an ongoing basis.** Never design a rule, check or metric that needs a person to label, and never add a static list drafted by an LLM as pipeline input. Classifications come from a named, dated source (scanner tags, PeeringDB, ASdb, the Public Suffix List) or a rule computed from the data, and the run log reports what each one covered.
+
+**The one exception is the finding-score table.** No one on the team can judge security severity, so an LLM answers fixed factual questions per finding type (is it exploited, can it be automated, what does an attacker get) and a fixed table turns the answers into a score. It may be pipeline input only if:
+
+- a `pipeline ref` command produces it from a versioned prompt; it is never typed or edited by hand
+- it covers distinct finding types, never records
+- every row records the strategy, prompt version, model, how it was run (API or Claude Code) and the date
+- the model's answers are checked against an outside source (KEV, EPSS) and against a second model, and the agreement is reported
+
+A finding type with no row is unscored, never guessed.
 
 ## LLM use
 

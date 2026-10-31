@@ -10,3 +10,4 @@ archive/data/
 .claude/settings.local.json
 .claude/context_ledger.md
 .claude/handoff/
+.env

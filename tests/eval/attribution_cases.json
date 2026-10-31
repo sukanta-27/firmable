@@ -1,0 +1,214 @@
+{
+  "about": "SYNTHETIC attribution test cases for gold. Each case is a made-up situation written in silver's shapes (address, service, identity_evidence), with the right answer known because the situation was constructed, not because a rule produced it. is_infrastructure and infra_reason are what silver outputs today for that shape, leaks included, so gold has to correct them. Addresses are RFC 5737 documentation ranges and ASNs are RFC 6996 private numbers, so no case can collide with real data. Company names and domains are invented. 'spread' repeats a service on that many consecutive addresses; in raw values {i} is the copy number and {o} is the address's last octet. truth is the company key (registrable domain, or the ASN for a domain-less service on a company-owned network), or null when no business can rightly be named. Scoring per service: truth named is correct, unknown is a miss, any other company is wrong.",
+  "cases": [
+    {
+      "id": "tenant_on_shared_hosting",
+      "scenario": "A dental practice's shop runs on a shared hosting server. The scanner asked for the shop's name; the address's reverse DNS names the hoster's server.",
+      "based_on": "Scan hostname as the strongest clue; hoster reverse DNS already flagged network_main_domain by silver",
+      "networks": [{"asn": "AS64512", "org": "Brightline Hosting Ltd", "owner_class": "hosting", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "192.0.2.1", "asn": "AS64512", "port": 443, "hostname": "shop.harbourdental.com.au", "truth": "harbourdental.com.au",
+         "evidence": [
+           {"type": "scan_hostname", "raw": "shop.harbourdental.com.au", "normalized": "harbourdental.com.au", "is_infrastructure": false, "infra_reason": null},
+           {"type": "dns_hostname", "raw": "srv41.brightlinehosting.net", "normalized": "brightlinehosting.net", "is_infrastructure": true, "infra_reason": "network_main_domain"}]}
+      ]
+    },
+    {
+      "id": "cloud_rdns_spread",
+      "scenario": "A cloud provider names every rented machine after itself in reverse DNS. Fifty customers' machines, one service each, all carry the provider's domain.",
+      "based_on": "azure.com 152 services on 152 addresses, sql.goog 125 on 125, passing silver's filter (gold-1-attribution.md, Leak 1)",
+      "networks": [{"asn": "AS64513", "org": "Nimbus Cloud Services", "owner_class": "cloud", "owner_class_source": "scanner_tag"}],
+      "services": [
+        {"ip": "198.51.100.1", "spread": 50, "asn": "AS64513", "port": 3389, "hostname": null, "truth": null,
+         "evidence": [
+           {"type": "dns_hostname", "raw": "vm{i}.westeu.nimbuscloud.net", "normalized": "nimbuscloud.net", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "cloud_customer_fleet",
+      "scenario": "A software company runs forty servers on the same cloud and names each one under its own domain. Same spread shape as the provider's own naming, but the domain is the tenant's.",
+      "based_on": "Inferred, not measured: the counter-case to cloud_rdns_spread. A shape-only landlord rule drops this company",
+      "networks": [{"asn": "AS64513", "org": "Nimbus Cloud Services", "owner_class": "cloud", "owner_class_source": "scanner_tag"}],
+      "services": [
+        {"ip": "198.51.100.150", "spread": 40, "asn": "AS64513", "port": 9100, "hostname": null, "truth": "vertexanalytics.io",
+         "evidence": [
+           {"type": "dns_hostname", "raw": "node{i}.vertexanalytics.io", "normalized": "vertexanalytics.io", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "hoster_ntlm_forest",
+      "scenario": "A Windows hosting company runs one directory for all its customers' servers. Every server reports the hoster's directory name, and nothing else names a business.",
+      "based_on": "dattaweb.com 106 services on 106 addresses, arvixe.com, liquidweb.com as NTLM forest names (signal-plan.md, G7 full run)",
+      "networks": [{"asn": "AS64514", "org": "Webcorral SA", "owner_class": "hosting", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "192.0.2.10", "spread": 40, "asn": "AS64514", "port": 3389, "hostname": null, "truth": null,
+         "evidence": [
+           {"type": "ntlm_dns_name", "raw": "win.webcorral.com", "normalized": "webcorral.com", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "tenant_ntlm_on_isp",
+      "scenario": "A manufacturer's office server sits on a broadband line. The server reports the company's own directory name; the provider's reverse DNS is an address-number name.",
+      "based_on": "Company NTLM forest names on ISP networks among the ransomware overlap (gold-8-evaluation.md)",
+      "networks": [{"asn": "AS64515", "org": "Telvia Broadband", "owner_class": "isp", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "192.0.2.60", "asn": "AS64515", "port": 3389, "hostname": null, "truth": "globexindustrial.com",
+         "evidence": [
+           {"type": "ntlm_dns_name", "raw": "corp.globexindustrial.com", "normalized": "globexindustrial.com", "is_infrastructure": false, "infra_reason": null},
+           {"type": "dns_hostname", "raw": "192-0-2-60.dyn.telvia.net", "normalized": "telvia.net", "is_infrastructure": true, "infra_reason": "ip_number_name"}]}
+      ]
+    },
+    {
+      "id": "university_own_network",
+      "scenario": "A university owns its network and names each machine under its own domain. Same spread shape as a landlord, but the network is the university's.",
+      "based_on": "mit.edu 113 services on 113 addresses on MIT's own network (gold-1-attribution.md)",
+      "networks": [{"asn": "AS64516", "org": "Northfield University", "owner_class": "edu", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "203.0.113.1", "spread": 40, "asn": "AS64516", "port": 22, "hostname": null, "truth": "northfield.edu",
+         "evidence": [
+           {"type": "dns_hostname", "raw": "host{i}.cs.northfield.edu", "normalized": "northfield.edu", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "company_network_no_domain",
+      "scenario": "A manufacturer owns its address block. Its exposed machines carry no name at all; only the network name says whose they are.",
+      "based_on": "Domain-less services on company-owned networks, keyed by ASN (gold-1-attribution.md, closed question 2)",
+      "networks": [{"asn": "AS64517", "org": "Initrode Manufacturing Inc", "owner_class": "enterprise", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "203.0.113.50", "spread": 5, "asn": "AS64517", "port": 445, "hostname": null, "truth": "AS64517", "evidence": []}
+      ]
+    },
+    {
+      "id": "landlord_declared_enterprise",
+      "scenario": "A server-rental company registered its network as 'Enterprise' in PeeringDB. Thirty customers' machines with no names sit on it.",
+      "based_on": "Hyonix, Servers.com, Beget, Cogent on PeeringDB 'Enterprise' networks; ASdb calls them landlords (gold-1-attribution.md, Leak 2). Baseline A + B is expected to fail this case",
+      "networks": [{"asn": "AS64518", "org": "Vectorhost LLC", "owner_class": "enterprise", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "203.0.113.60", "spread": 30, "asn": "AS64518", "port": 22, "hostname": null, "truth": null, "evidence": []}
+      ]
+    },
+    {
+      "id": "scan_hostname_vs_stale_rdns",
+      "scenario": "A freight company's portal runs on a rented server whose reverse DNS still names the previous tenant, a bakery.",
+      "based_on": "Inferred, not measured: two business clues that disagree (736 services with two or more business domains, gold-1-attribution.md)",
+      "networks": [{"asn": "AS64519", "org": "Corvex Datacenters", "owner_class": "hosting", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "192.0.2.70", "asn": "AS64519", "port": 443, "hostname": "portal.meridianfreight.com", "truth": "meridianfreight.com",
+         "evidence": [
+           {"type": "scan_hostname", "raw": "portal.meridianfreight.com", "normalized": "meridianfreight.com", "is_infrastructure": false, "infra_reason": null},
+           {"type": "dns_hostname", "raw": "mail.saltandcrumbbakery.com", "normalized": "saltandcrumbbakery.com", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "placeholder_domain",
+      "scenario": "Twenty devices carry the reserved placeholder name example.com, left in a default configuration.",
+      "based_on": "example.com passes silver's filter as a business on 638 services (gold-8-evaluation.md)",
+      "networks": [{"asn": "AS64520", "org": "Kestrel Networks", "owner_class": "isp", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "192.0.2.80", "spread": 20, "asn": "AS64520", "port": 80, "hostname": null, "truth": null,
+         "evidence": [
+           {"type": "dns_hostname", "raw": "example.com", "normalized": "example.com", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "home_lines_ip_number_rdns",
+      "scenario": "Home routers on a broadband provider. Reverse DNS is the address written as a name under the provider's domain.",
+      "based_on": "ip_number_name, e.g. 179-125-1-1.provider.net (CLAUDE.md domain rules)",
+      "networks": [{"asn": "AS64521", "org": "Fibranet Telecom", "owner_class": "isp", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "192.0.2.110", "spread": 10, "asn": "AS64521", "port": 7547, "hostname": null, "truth": null,
+         "evidence": [
+           {"type": "dns_hostname", "raw": "192-0-2-{o}.fibranet.com.br", "normalized": "fibranet.com.br", "is_infrastructure": true, "infra_reason": "ip_number_name"}]}
+      ]
+    },
+    {
+      "id": "cdn_scanned_by_hostname",
+      "scenario": "A retailer's website sits behind a CDN. The scanner asked for the retailer's name, so the record describes the retailer.",
+      "based_on": "CDN records scanned by hostname stay attributable (silver-schema.md, cdn_edge)",
+      "networks": [{"asn": "AS64522", "org": "Swiftedge CDN", "owner_class": "cdn", "owner_class_source": "scanner_tag"}],
+      "services": [
+        {"ip": "198.51.100.60", "asn": "AS64522", "port": 443, "hostname": "www.larkspurretail.com", "truth": "larkspurretail.com",
+         "evidence": [
+           {"type": "scan_hostname", "raw": "www.larkspurretail.com", "normalized": "larkspurretail.com", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "platform_subdomain",
+      "scenario": "A site lives on a hosting platform's shared domain, with no domain of its own. Nothing names a company domain.",
+      "based_on": "platform_domain: a name under a Public Suffix List private suffix (silver-plan.md W16)",
+      "networks": [{"asn": "AS64523", "org": "Pagewell Platform Inc", "owner_class": "cloud", "owner_class_source": "scanner_tag"}],
+      "services": [
+        {"ip": "198.51.100.70", "asn": "AS64523", "port": 443, "hostname": "larkspur-docs.netlify.app", "truth": null,
+         "evidence": [
+           {"type": "scan_hostname", "raw": "larkspur-docs.netlify.app", "normalized": "netlify.app", "is_infrastructure": true, "infra_reason": "platform_domain"}]}
+      ]
+    },
+    {
+      "id": "virtual_hosting_one_address",
+      "scenario": "Three small businesses share one hosting address. Each website is its own service because the hostname is part of the service key.",
+      "based_on": "hostname in service_key because one address serves many businesses (silver-schema.md)",
+      "networks": [{"asn": "AS64512", "org": "Brightline Hosting Ltd", "owner_class": "hosting", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "192.0.2.120", "asn": "AS64512", "port": 443, "hostname": "www.quillandcoffee.com", "truth": "quillandcoffee.com",
+         "evidence": [
+           {"type": "scan_hostname", "raw": "www.quillandcoffee.com", "normalized": "quillandcoffee.com", "is_infrastructure": false, "infra_reason": null},
+           {"type": "dns_hostname", "raw": "srv77.brightlinehosting.net", "normalized": "brightlinehosting.net", "is_infrastructure": true, "infra_reason": "network_main_domain"}]},
+        {"ip": "192.0.2.120", "asn": "AS64512", "port": 443, "hostname": "www.redfernplumbing.co.uk", "truth": "redfernplumbing.co.uk",
+         "evidence": [
+           {"type": "scan_hostname", "raw": "www.redfernplumbing.co.uk", "normalized": "redfernplumbing.co.uk", "is_infrastructure": false, "infra_reason": null},
+           {"type": "dns_hostname", "raw": "srv77.brightlinehosting.net", "normalized": "brightlinehosting.net", "is_infrastructure": true, "infra_reason": "network_main_domain"}]},
+        {"ip": "192.0.2.120", "asn": "AS64512", "port": 443, "hostname": "booking.saltmarshyoga.com", "truth": "saltmarshyoga.com",
+         "evidence": [
+           {"type": "scan_hostname", "raw": "booking.saltmarshyoga.com", "normalized": "saltmarshyoga.com", "is_infrastructure": false, "infra_reason": null},
+           {"type": "dns_hostname", "raw": "srv77.brightlinehosting.net", "normalized": "brightlinehosting.net", "is_infrastructure": true, "infra_reason": "network_main_domain"}]}
+      ]
+    },
+    {
+      "id": "template_directory_name",
+      "scenario": "Directory servers on three unrelated networks all report the same generic name left from a setup template. It names no one.",
+      "based_on": "group.org, global.io, local.net as NTLM and LDAP names across 3-5 networks (signal-plan.md)",
+      "networks": [
+        {"asn": "AS64524", "org": "Orbis Telecom", "owner_class": "isp", "owner_class_source": "peeringdb"},
+        {"asn": "AS64525", "org": "Quarry Hosting GmbH", "owner_class": "hosting", "owner_class_source": "peeringdb"},
+        {"asn": "AS64526", "org": "Pinecrest Cable", "owner_class": "isp", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "198.51.100.80", "asn": "AS64524", "port": 389, "hostname": null, "truth": null,
+         "evidence": [{"type": "ldap_dns_name", "raw": "dc01.local.net", "normalized": "local.net", "is_infrastructure": false, "infra_reason": null}]},
+        {"ip": "198.51.100.81", "asn": "AS64525", "port": 389, "hostname": null, "truth": null,
+         "evidence": [{"type": "ldap_dns_name", "raw": "dc01.local.net", "normalized": "local.net", "is_infrastructure": false, "infra_reason": null}]},
+        {"ip": "198.51.100.82", "asn": "AS64526", "port": 3389, "hostname": null, "truth": null,
+         "evidence": [{"type": "ntlm_dns_name", "raw": "local.net", "normalized": "local.net", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "company_on_unclassified_network",
+      "scenario": "A polytechnic runs its own small network that no registry classifies. Its VPN and web services are scanned by the polytechnic's name.",
+      "based_on": "cdu.edu.au 315 services on 3 addresses, on a network with owner_class unknown (gold-1-attribution.md)",
+      "networks": [{"asn": "AS64527", "org": "Southgate Polytechnic", "owner_class": "unknown", "owner_class_source": "none"}],
+      "services": [
+        {"ip": "198.51.100.90", "spread": 3, "asn": "AS64527", "port": 443, "hostname": "vpn.southgatepoly.edu.au", "truth": "southgatepoly.edu.au",
+         "evidence": [
+           {"type": "scan_hostname", "raw": "vpn.southgatepoly.edu.au", "normalized": "southgatepoly.edu.au", "is_infrastructure": false, "infra_reason": null},
+           {"type": "dns_hostname", "raw": "gw{o}.southgatepoly.edu.au", "normalized": "southgatepoly.edu.au", "is_infrastructure": false, "infra_reason": null}]},
+        {"ip": "198.51.100.90", "spread": 3, "asn": "AS64527", "port": 8443, "hostname": "vpn.southgatepoly.edu.au", "truth": "southgatepoly.edu.au",
+         "evidence": [
+           {"type": "scan_hostname", "raw": "vpn.southgatepoly.edu.au", "normalized": "southgatepoly.edu.au", "is_infrastructure": false, "infra_reason": null},
+           {"type": "dns_hostname", "raw": "gw{o}.southgatepoly.edu.au", "normalized": "southgatepoly.edu.au", "is_infrastructure": false, "infra_reason": null}]},
+        {"ip": "198.51.100.90", "spread": 3, "asn": "AS64527", "port": 3389, "hostname": null, "truth": "southgatepoly.edu.au",
+         "evidence": [
+           {"type": "dns_hostname", "raw": "gw{o}.southgatepoly.edu.au", "normalized": "southgatepoly.edu.au", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    },
+    {
+      "id": "small_business_rdns_only",
+      "scenario": "A law firm's mail server on a business broadband line. The only clue is reverse DNS the firm asked its provider to set. Weak, but right; unknown is an acceptable miss here.",
+      "based_on": "Inferred, not measured: a single dns_hostname clue on an ISP network",
+      "networks": [{"asn": "AS64528", "org": "Coastal Fibre Pty Ltd", "owner_class": "isp", "owner_class_source": "peeringdb"}],
+      "services": [
+        {"ip": "203.0.113.100", "asn": "AS64528", "port": 25, "hostname": null, "truth": "smithandreidlaw.com.au",
+         "evidence": [
+           {"type": "dns_hostname", "raw": "mail.smithandreidlaw.com.au", "normalized": "smithandreidlaw.com.au", "is_infrastructure": false, "infra_reason": null}]}
+      ]
+    }
+  ]
+}
