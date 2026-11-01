@@ -4,17 +4,24 @@ Only `service` is deduplicated. The other tables keep one row per sighting, so a
 seen once is never lost to dedupe.
 """
 
-import subprocess
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from importlib.metadata import version
 from pathlib import Path
 
 import duckdb
 
 from pipeline import stage
-from pipeline.meta import Check, Manifest, RunLog, Status, manifest_path, write_json
-from pipeline.ref import peeringdb
+from pipeline.meta import (
+    Check,
+    Manifest,
+    RunLog,
+    Status,
+    code_version,
+    manifest_path,
+    write_json,
+)
+from pipeline.ref import snapshot
 from pipeline.settings import Settings
 from pipeline.silver import address, checks, identity, service, sightings, signal, vuln
 
@@ -41,11 +48,11 @@ def build(manifest: Manifest, settings: Settings, start_at: str = STEP_NAMES[0])
         resumed_from=None if start_at == STEP_NAMES[0] else start_at,
     )
     try:
-        snapshot, as_of = peeringdb.newest(settings.ref_root)
-    except peeringdb.SnapshotError as e:
+        peeringdb_dir, as_of = snapshot.newest(settings.ref_root, "peeringdb")
+    except snapshot.SnapshotError as e:
         _finish(log, manifest, settings.data_root, str(e))
         return log
-    log.refs = {"peeringdb_as_of": as_of.isoformat(), "tldextract": version("tldextract")}
+    log.refs = {"peeringdb_as_of": as_of, "tldextract": version("tldextract")}
 
     bronze = settings.data_root / "bronze"
     setup = f"""
@@ -53,14 +60,15 @@ def build(manifest: Manifest, settings: Settings, start_at: str = STEP_NAMES[0])
           '{bronze}/banner/file_id={manifest.file_id}/*.parquet', hive_partitioning=false);
         CREATE VIEW bronze_vuln AS SELECT * FROM read_parquet(
           '{bronze}/vuln/file_id={manifest.file_id}/*.parquet', hive_partitioning=false);
-        CREATE VIEW peeringdb AS SELECT * FROM read_parquet('{snapshot}/*.parquet');
+        CREATE VIEW peeringdb AS SELECT * FROM read_parquet('{peeringdb_dir}/*.parquet');
     """
 
     def run_checks(
         con: duckdb.DuckDBPyConnection, staging: Path, rows: dict[str, int]
     ) -> list[Check]:
         found, log.metrics = checks.run(con, staging, rows)
-        log.metrics["peeringdb_age_days"] = float((datetime.now(UTC).date() - as_of).days)
+        age = datetime.now(UTC).date() - date.fromisoformat(as_of)
+        log.metrics["peeringdb_age_days"] = float(age.days)
         return found
 
     error = stage.run(
@@ -68,25 +76,6 @@ def build(manifest: Manifest, settings: Settings, start_at: str = STEP_NAMES[0])
     )
     _finish(log, manifest, settings.data_root, error)
     return log
-
-
-def _code_version() -> str:
-    """The git commit of this code, with "-dirty" when the tree has uncommitted changes."""
-    here = Path(__file__).parent
-    try:
-        commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True, cwd=here
-        ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=here,
-        ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
-    return f"{commit}-dirty" if dirty else commit
 
 
 def _finish(log: RunLog, manifest: Manifest, data_root: Path, error: str | None) -> None:
@@ -102,7 +91,7 @@ def _finish(log: RunLog, manifest: Manifest, data_root: Path, error: str | None)
         manifest.status = Status.SILVER
         manifest.error = None
         manifest.silver_run_id = log.run_id
-        manifest.silver_code_version = _code_version()
+        manifest.silver_code_version = code_version()
     log.finished_at = datetime.now(UTC)
     write_json(manifest_path(data_root, manifest.file_id), manifest)
     write_json(data_root / "_meta" / "run" / f"{log.run_id}.json", log)

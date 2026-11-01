@@ -1,13 +1,27 @@
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 
 class RefSettings(BaseSettings):
-    """What reference snapshots need. Split out so fetching one does not demand a DATA_ROOT."""
+    """What works without a dataset: reference snapshots, the finding-score answers and the
+    synthetic eval. Split out so those commands do not demand a DATA_ROOT."""
 
     # Outside every data root: the sample and full datasets share one snapshot.
     ref_root: Path = Path("data/ref")
+    attributor: str = "rules_ab_v1"
+    attribution_cases: Path = Path("tests/eval/attribution_cases.json")
+    # Committed: written only by `pipeline ref finding-scores import`, never by hand.
+    answers_path: Path = Path("finding_scores/answers.jsonl")
+    # The model whose answers gold scores with; the other model's are the second opinion.
+    answers_model: str = "claude-opus-5-5"
+    prompt_version: str = "v1"
+    finding_scorer: str = "ssvc_v1"
+    kev_path: Path = Path("data/external/kev.json")
+    epss_path: Path = Path("data/external/epss_scores-current.csv.gz")
+    # Only the untested `ask` command uses it; None lets the SDK find its own credentials.
+    anthropic_api_key: SecretStr | None = None
 
 
 class Settings(RefSettings):

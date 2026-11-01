@@ -6,12 +6,14 @@ never fetches, so a run is reproducible from the snapshot date it records.
 
 import shutil
 import tempfile
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
 import requests
 from pydantic import BaseModel
+
+from pipeline.ref.snapshot import SnapshotError
 
 URL = "https://www.peeringdb.com/api/net?fields=asn,name,info_type,info_types"
 # 35,798 networks on 2026-10-30. A response far below that is an error page or a truncated
@@ -28,10 +30,6 @@ class Network(BaseModel):
 
 class Response(BaseModel):
     data: list[Network]
-
-
-class SnapshotError(Exception):
-    pass
 
 
 def fetch(ref_root: Path) -> tuple[Path, int]:
@@ -63,13 +61,3 @@ def fetch(ref_root: Path) -> tuple[Path, int]:
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return target, len(networks)
-
-
-def newest(ref_root: Path) -> tuple[Path, date]:
-    """The latest snapshot folder and its date."""
-    found = sorted((ref_root / "peeringdb").glob("as_of=*"))
-    if not found:
-        raise SnapshotError(
-            f"no PeeringDB snapshot under {ref_root}; run `pipeline ref peeringdb` first"
-        )
-    return found[-1], date.fromisoformat(found[-1].name.removeprefix("as_of="))

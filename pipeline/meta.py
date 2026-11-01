@@ -1,4 +1,5 @@
 import os
+import subprocess
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
@@ -10,6 +11,7 @@ class Status(StrEnum):
     RECEIVED = "received"
     BRONZE = "bronze"
     SILVER = "silver"
+    GOLD = "gold"
     FAILED = "failed"
 
 
@@ -29,6 +31,8 @@ class Manifest(BaseModel):
     silver_run_id: str | None = None
     # git commit of the code that built silver, with "-dirty" when the tree had changes.
     silver_code_version: str | None = None
+    gold_run_id: str | None = None
+    gold_code_version: str | None = None
 
 
 class Check(BaseModel):
@@ -77,3 +81,22 @@ def write_json(path: Path, model: BaseModel) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(model.model_dump_json(indent=2))
     os.replace(tmp, path)
+
+
+def code_version() -> str:
+    """The git commit of this code, with "-dirty" when the tree has uncommitted changes."""
+    here = Path(__file__).parent
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True, cwd=here
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=here,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return f"{commit}-dirty" if dirty else commit

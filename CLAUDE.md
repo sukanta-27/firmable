@@ -15,6 +15,10 @@ Python 3.12, FastAPI, Pydantic v2, pydantic-settings, DuckDB over Parquet. Manag
 | Bronze for one file | `DATA_ROOT=data/runs/sample uv run python -m pipeline bronze data/samples/stride400.jsonl` (add `--from cve_pass` to resume a failed run, `--force` to rebuild) |
 | PeeringDB snapshot (silver needs one) | `uv run python -m pipeline ref peeringdb` (writes `data/ref/peeringdb/as_of=<UTC date>/`) |
 | Silver for one file | `DATA_ROOT=data/runs/sample uv run python -m pipeline silver data/samples/stride400.jsonl` (same `--from <step>` and `--force`) |
+| Gold for one file | `DATA_ROOT=data/runs/sample uv run python -m pipeline gold data/samples/stride400.jsonl` (same `--from <step>` and `--force`; needs an ASdb snapshot in `data/ref/asdb/as_of=<YYYY-MM>/`, downloaded by hand from asdb.stanford.edu) |
+| Finding-score prompt | `DATA_ROOT=data/runs/full uv run python -m pipeline ref finding-scores render`, then `… import --answers <reply.json> --model <id>` and `… check` |
+| Attribution on the synthetic cases | `uv run python -m pipeline eval attribution` |
+| Compare the company scorers | `DATA_ROOT=data/runs/full uv run python -m pipeline eval ranking <source>` |
 | Run the API | `uv run fastapi dev api/main.py` |
 | Tests | `uv run pytest` |
 | Lint + format | `uv run ruff check --fix . && uv run ruff format .` |
@@ -35,6 +39,7 @@ Before saying work is done: `ruff check`, `mypy` and `pytest` pass, and you ran 
 | `docs/` | Findings, each number traceable to a script | Amend in place when wrong; never add a contradicting doc beside it |
 | `archive/` | Frozen exploration scripts that reproduce the numbers in `docs/` | **Read-only.** Never import from it. Copy what you need into `pipeline/` |
 | `data/` | Raw dump, samples, external feeds (KEV, EPSS). Git-ignored | See "Data" below |
+| `finding_scores/` | The AI's validated answers per finding type, which gold scores with. Committed | Written only by `pipeline ref finding-scores import`. Never edited by hand |
 
 `api/` and `web/` don't exist yet. Create modules when the first code needs them, not ahead of it.
 

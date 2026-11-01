@@ -1,5 +1,5 @@
 {
-  "about": "SYNTHETIC attribution test cases for gold. Each case is a made-up situation written in silver's shapes (address, service, identity_evidence), with the right answer known because the situation was constructed, not because a rule produced it. is_infrastructure and infra_reason are what silver outputs today for that shape, leaks included, so gold has to correct them. Addresses are RFC 5737 documentation ranges and ASNs are RFC 6996 private numbers, so no case can collide with real data. Company names and domains are invented. 'spread' repeats a service on that many consecutive addresses; in raw values {i} is the copy number and {o} is the address's last octet. truth is the company key (registrable domain, or the ASN for a domain-less service on a company-owned network), or null when no business can rightly be named. Scoring per service: truth named is correct, unknown is a miss, any other company is wrong.",
+  "about": "SYNTHETIC attribution test cases for gold. Each case is a made-up situation written in silver's shapes (address, service, identity_evidence), with the right answer known because the situation was constructed, not because a rule produced it. is_infrastructure and infra_reason are what silver outputs today for that shape, leaks included, so gold has to correct them. Addresses are RFC 5737 documentation ranges and ASNs are RFC 6996 private numbers, so no case can collide with real data. Company names and domains are invented. 'spread' repeats a service on that many consecutive addresses; in raw values {i} is the copy number and {o} is the address's last octet. truth is the company key (registrable domain, or the ASN for a domain-less service on a company-owned network), or null when no business can rightly be named. Scoring per service: truth named is correct, unknown is a miss, any other company is wrong. A network's optional asdb_landlord: true stands for ASdb calling it a landlord, since private ASNs are not in ASdb.",
   "cases": [
     {
       "id": "tenant_on_shared_hosting",
@@ -81,8 +81,8 @@
     {
       "id": "landlord_declared_enterprise",
       "scenario": "A server-rental company registered its network as 'Enterprise' in PeeringDB. Thirty customers' machines with no names sit on it.",
-      "based_on": "Hyonix, Servers.com, Beget, Cogent on PeeringDB 'Enterprise' networks; ASdb calls them landlords (gold-1-attribution.md, Leak 2). Baseline A + B is expected to fail this case",
-      "networks": [{"asn": "AS64518", "org": "Vectorhost LLC", "owner_class": "enterprise", "owner_class_source": "peeringdb"}],
+      "based_on": "Hyonix, Servers.com, Beget, Cogent on PeeringDB 'Enterprise' networks; ASdb calls them landlords (gold-1-attribution.md, Leak 2). A + B alone fail this case; the ASdb landlord-only rule is what passes it",
+      "networks": [{"asn": "AS64518", "org": "Vectorhost LLC", "owner_class": "enterprise", "owner_class_source": "peeringdb", "asdb_landlord": true}],
       "services": [
         {"ip": "203.0.113.60", "spread": 30, "asn": "AS64518", "port": 22, "hostname": null, "truth": null, "evidence": []}
       ]

@@ -272,3 +272,64 @@ RULES: dict[str, Rule] = {
         "concat_ws(' | ', 'eol-os', os, array_to_string(cpe23, ','), left(data, 160))",
     ),
 }
+
+# What each rule checks, in plain words, for the finding-score prompt. Kept free of counts,
+# exploit lists and our own risk split: the prompt is answered blind and checked against those.
+DESCRIPTIONS: dict[str, str] = {
+    "heartbleed_vulnerable": "A TLS service answered a Heartbleed test (CVE-2014-0160) in a way "
+    "that shows it leaks the contents of its memory.",
+    "tag_compromised": "The scanner marked the host as compromised: its reply shows signs that "
+    "an attacker already controls it.",
+    "ransom_note": "A database or search index is named like a ransom note, or a web page asks "
+    "for bitcoin to recover files: someone has already wiped or encrypted data and left a demand.",
+    "mongodb_noauth": "A MongoDB database answers queries without asking for a login.",
+    "redis_noauth": "A Redis data store answers commands and shows its data without a password.",
+    "elastic_indices": "An Elasticsearch server lists its data indices to anyone, without a login.",
+    "docker_registry_open": "A Docker image registry lists its stored images to anyone, without "
+    "a login.",
+    "ftp_anonymous": "An FTP file server accepted an anonymous login.",
+    "smb_anonymous": "A Windows file-sharing (SMB) server lets anyone list at least one disk "
+    "share without a login.",
+    "vnc_noauth": "A VNC remote-desktop server offers access with no password.",
+    "lantronix_password": "A Lantronix device server (a serial-to-network adapter) reveals its "
+    "admin password in its reply.",
+    "printer_no_password": "An HP printer's web admin page has no admin password set.",
+    "ai_llm_open": "A self-hosted AI model server (Ollama, llama.cpp, LocalAI, ComfyUI or "
+    "AnythingLLM) accepts requests without a login.",
+    "ics_protocol": "An industrial control system (Siemens S7, BACnet, EtherNet/IP, CODESYS, "
+    "KNX, PCWorx, MELSEC or Modbus) answers control-protocol requests from the internet.",
+    "tag_ssh_bad_key": "An SSH server uses a host key that is publicly known (shipped as a "
+    "default or leaked), so its connections can be impersonated or decrypted.",
+    "opts_vuln_tilde": "The scanner listed a vulnerability for this service as possible but "
+    "unconfirmed, inferred from the software version.",
+    "atg_inventory": "A fuel-tank gauge (automatic tank gauge) answers inventory commands from the "
+    "internet, showing tank contents and levels.",
+    "rsync_noauth": "An rsync file-sync server lists its shared folders without a login.",
+    "ipmi_exposed": "A server's out-of-band management controller (IPMI) is reachable from the "
+    "internet.",
+    "esxi_exposed": "A VMware ESXi or vCenter virtualisation management service is reachable from "
+    "the internet.",
+    "ntp_monlist": "An NTP time server answers the 'monlist' command, which returns a list of its "
+    "recent clients and a reply much larger than the request.",
+    "dns_open_resolver": "A DNS server answers recursive lookups for anyone on the internet.",
+    "snmp_v1_v2": "An SNMP v1 or v2 network-management service returned the device's description "
+    "or name to a community string (a shared password, often a default).",
+    "rdp_exposed": "A Windows Remote Desktop (RDP) login is reachable from the internet.",
+    "rdp_standard_security": "A Windows Remote Desktop server accepts its legacy 'Standard RDP "
+    "Security' mode instead of requiring TLS with network-level authentication.",
+    "smb_v1": "A Windows file-sharing server speaks SMB version 1, the original protocol version.",
+    "telnet_object": "A Telnet service (an unencrypted remote login) is reachable from the "
+    "internet.",
+    "node_exporter_open": "A Prometheus node exporter publishes the machine's system metrics to "
+    "anyone.",
+    "http_dir_listing": "A web server shows a listing of the files in a directory.",
+    "tag_database": "A database server (such as MySQL, PostgreSQL or SQL Server) is reachable from "
+    "the internet and answered the scanner rather than refusing it.",
+    "tag_medical": "A medical imaging system (DICOM) accepted a connection from the internet.",
+    "tls_sslv2_sslv3": "The service still accepts the obsolete SSLv2 or SSLv3 encryption "
+    "protocols.",
+    "tls_weak_key": "The service's certificate uses an RSA key under 2048 bits or an MD5 "
+    "signature.",
+    "tag_eol_os": "The scanner identified the operating system as end-of-life: it no longer gets "
+    "security updates.",
+}
