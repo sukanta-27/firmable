@@ -1,12 +1,53 @@
-:root {
+/* The wireframe's look: light, near-black ink, square edges, black for primary actions.
+   Pico sets its light theme on :root:not([data-theme=dark]); matching that specificity and
+   loading after Pico is what lets these win. */
+:root[data-theme="light"] {
+  --ink: #1a1a1a;
+  --pico-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --pico-font-size: 93.75%;
-  --alarm-bg: #1f2328;
+  --pico-line-height: 1.45;
+  --pico-border-radius: 0;
+  --pico-background-color: #ffffff;
+  --pico-color: var(--ink);
+  --pico-muted-color: #595959;
+  --pico-muted-border-color: #cccccc;
+  --pico-h1-color: var(--ink); --pico-h2-color: var(--ink); --pico-h3-color: var(--ink);
+  --pico-h4-color: var(--ink); --pico-h5-color: var(--ink); --pico-h6-color: var(--ink);
+  --pico-primary: var(--ink);
+  --pico-primary-background: var(--ink);
+  --pico-primary-border: var(--ink);
+  --pico-primary-underline: rgba(26, 26, 26, 0.4);
+  --pico-primary-hover: #000000;
+  --pico-primary-hover-background: #000000;
+  --pico-primary-hover-border: #000000;
+  --pico-primary-hover-underline: #000000;
+  --pico-primary-focus: rgba(26, 26, 26, 0.25);
+  --pico-primary-inverse: #ffffff;
+  --pico-secondary: var(--ink);
+  --pico-secondary-background: #ffffff;
+  --pico-secondary-border: var(--ink);
+  --pico-secondary-hover: #000000;
+  --pico-secondary-hover-background: #f0f0f0;
+  --pico-secondary-hover-border: #000000;
+  --pico-secondary-inverse: var(--ink);
+  --pico-form-element-background-color: #ffffff;
+  --pico-form-element-border-color: #555555;
+  --pico-form-element-active-border-color: var(--ink);
+  --pico-form-element-focus-color: rgba(26, 26, 26, 0.25);
+  --pico-form-element-spacing-vertical: 0.5rem;
+  --pico-card-background-color: #ffffff;
+  --pico-card-sectioning-background-color: #f4f4f4;
+  --pico-table-border-color: #cccccc;
+  --pico-code-background-color: #f0f0f0;
+  --pico-code-color: var(--ink);
+  --pico-spacing: 1rem;
+  --alarm-bg: var(--ink);
   --alarm-fg: #ffffff;
   --line-size: 1.05rem;
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root { --alarm-bg: #f0f0f0; --alarm-fg: #111111; }
-}
+body { background: #ffffff; }
+a { text-underline-offset: 0.15em; }
 
 .muted { color: var(--pico-muted-color); }
 .small { font-size: 0.8rem; }
@@ -58,17 +99,17 @@ main.login h1 { font-size: 1.4rem; }
 .tag.score-high { background: var(--pico-color); color: var(--pico-background-color); }
 
 /* Leads page layout */
-.leads { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 2.5rem; padding-top: 1.5rem; }
+.leads { display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 2.5rem; padding-top: 1.5rem; }
 @media (max-width: 900px) { .leads { grid-template-columns: 1fr; } }
 .filters { display: flex; flex-direction: column; gap: 1.25rem; }
 .filters fieldset { margin: 0; padding: 0; border: 0; }
 .filters legend, .filters .label { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem; display: block; }
-.filters label.ck { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.9rem; margin-bottom: 0.35rem; }
+.filters label.ck { width: 100%; display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.9rem; margin-bottom: 0.35rem; }
 .filters label.ck input { margin-top: 0.2rem; flex: none; }
 .filters .cnt { margin-left: auto; font-size: 0.75rem; color: var(--pico-muted-color); font-variant-numeric: tabular-nums; padding-left: 0.5rem; white-space: nowrap; }
 .filters .help { font-size: 0.75rem; color: var(--pico-muted-color); margin: -0.2rem 0 0.4rem 1.6rem; }
 .filters details summary { font-size: 0.8rem; }
-.filters input[type="search"] { margin-bottom: 0; }
+.filters input[type="search"] { margin-bottom: 0; font-size: 0.9rem; }
 .quick { display: flex; flex-direction: column; gap: 0.35rem; }
 .quick a {
   display: block; font-size: 0.85rem; padding: 0.4rem 0.7rem; text-decoration: none;
@@ -147,9 +188,9 @@ pre.evidence { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.75re
 .report { max-width: 52rem; }
 .report-layout { display: grid; grid-template-columns: 12rem minmax(0, 52rem); gap: 2.5rem; padding-top: 1.5rem; }
 @media (max-width: 900px) { .report-layout { grid-template-columns: 1fr; } }
-.report-layout nav.toc { position: sticky; top: 1rem; align-self: start; font-size: 0.85rem; }
-.report-layout nav.toc ul { padding: 0; }
-.report-layout nav.toc li { list-style: none; margin-bottom: 0.4rem; }
+.report-layout .toc { position: sticky; top: 1rem; align-self: start; font-size: 0.85rem; }
+.report-layout .toc ul { padding: 0; margin-top: 0.5rem; }
+.report-layout .toc li { list-style: none; margin-bottom: 0.4rem; }
 .report section { margin-bottom: 2.5rem; }
 .prov { font-size: 0.75rem; color: var(--pico-muted-color); border-left: 3px solid var(--pico-muted-border-color); padding: 0.2rem 0.6rem; margin-bottom: 1rem; }
 .answer { font-size: 1.05rem; }
@@ -159,3 +200,32 @@ table.report tr.flag td:first-child { border-left: 4px solid var(--pico-color); 
 .boxed { border: 2px solid var(--pico-color); padding: 0.5rem 0.9rem; font-weight: 700; display: inline-block; margin-bottom: 1rem; }
 .notrun { border: 1px dashed var(--pico-muted-color); padding: 1rem; border-radius: var(--pico-border-radius); }
 .source { font-size: 0.85rem; }
+
+/* Wireframe shapes over Pico's defaults */
+.appbar { border-bottom: 2px solid var(--ink); }
+.appbar nav li { padding-block: 0.6rem; }
+.appbar a { color: var(--ink); }
+input[type="search"] { border-radius: 0; }
+input, select, button, [role="button"] { box-shadow: none; }
+.badge { border-radius: 0; border-color: #555555; background: #ffffff; color: var(--ink); }
+.badge.High { border-color: var(--ink); }
+.tag { background: #f0f0f0; border: 1px solid #888888; border-radius: 0; color: var(--ink); }
+.tag.alarm { border-color: var(--ink); }
+.tag.score-high { background: var(--ink); color: #ffffff; border-color: var(--ink); }
+.quick a { border-color: #999999; border-radius: 0; color: var(--ink); }
+.quick a:hover { border-color: var(--ink); background: #f4f4f4; }
+.cname { color: var(--ink); }
+.result-head { border-bottom: 2px solid var(--ink); }
+.result-head .count { font-size: 1.75rem; }
+.chip { border-color: #555555; color: var(--ink); }
+.chip .x { background: #e0e0e0; }
+.pager a { border-color: #999999; border-radius: 0; color: var(--ink); }
+.pager span.cur { border-radius: 0; }
+.picker { border: 2px solid var(--ink); border-radius: 0; }
+.pgh { background: #efefef; padding: 0.4rem 0.5rem; }
+.hero { border-radius: 0; }
+details.finding { border-color: #999999; border-radius: 0; }
+.notice { border-radius: 0; }
+.notrun { border-radius: 0; }
+.site-footer { border-top-color: #999999; }
+.site-footer summary { color: var(--ink); }
