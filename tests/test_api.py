@@ -256,6 +256,57 @@ def test_csv_holds_the_list_in_the_same_order(client: TestClient) -> None:
     assert {r["scorer"] for r in rows} == {"sum_x_confidence_v1"}
 
 
+def page_rows(html: str) -> dict[str, str]:
+    """The list page's rows, in order, keyed by company."""
+    out = {}
+    for row in html.split('<li class="row">')[1:]:
+        link = re.search(r'href="/companies/([^"?]+)\?', row)
+        assert link, row
+        out[link.group(1)] = row
+    return out
+
+
+def test_list_page_shows_the_api_list_and_exports_it(client: TestClient) -> None:
+    log_in(client)
+    queries: list[list[tuple[str, str | int | float | bool | None]]] = [
+        [],
+        [("confidence", "High")],
+        [("finding_type", "ftp_anonymous"), ("finding_type", "rdp_exposed")],
+        [("scorer", "sum_x_confidence_v1")],
+        [("already_breached", "true")],
+    ]
+    for query in queries:
+        api = client.get("/api/companies", params=[*query, ("limit", "200")]).json()
+        expected = [c["company_key"] for c in api["items"]]
+        assert expected, f"{query} matches nothing, so the comparison would be empty"
+        html = client.get("/", params=query).text
+        assert list(page_rows(html)) == expected, query
+        export = re.search(r'href="(/api/companies\.csv\?[^"]*)"', html)
+        assert export, query
+        rows = csv.DictReader(io.StringIO(client.get(export.group(1).replace("&amp;", "&")).text))
+        assert [r["company_key"] for r in rows] == expected, query
+
+
+def test_only_break_in_findings_say_break_in(client: TestClient) -> None:
+    log_in(client)
+    rows = page_rows(client.get("/").text)
+    saying = {key for key, row in rows.items() if "Signs of a break-in" in row}
+    assert saying == {"breached.com"}
+
+
+def test_unranked_company_comes_last_and_says_why(client: TestClient) -> None:
+    log_in(client)
+    html = client.get("/").text
+    rows = page_rows(html)
+    last_key, last_row = list(rows.items())[-1]
+    assert last_key == "thirdco.com"
+    assert "Not ranked" in last_row
+    assert "We found a problem here that we haven&#39;t assessed yet." in last_row
+    divider = "Not ranked yet."
+    assert html.count(divider) == 1
+    assert html.index(divider) < html.index('href="/companies/thirdco.com?')
+
+
 def test_csv_cells_cannot_run_as_spreadsheet_formulas(client: TestClient) -> None:
     log_in(client)
     rows = list(csv.DictReader(io.StringIO(client.get("/api/companies.csv").text)))

@@ -1,0 +1,6 @@
+<legend>Problem{% if page.finding_type %} <span class="muted small">· {{ page.finding_type | length }} chosen</span>{% endif %}</legend>
+{% for t in shortlist %}
+  <label class="ck"><input type="checkbox" name="finding_type" value="{{ t.finding_type }}"
+    {% if t.finding_type in page.finding_type %}checked{% endif %}>
+    <span title="{{ t.salesperson_line or t.finding_type }}">{{ problem_label(t) }}</span><span class="cnt">{{ t.companies | num }}</span></label>
+{% endfor %}

@@ -1,2 +1,61 @@
 {% extends "base.html" %}
-{% block content %}{% endblock %}
+{% block content %}
+<div class="leads">
+  <form id="filters" class="filters" action="/" method="get"
+        hx-get="/" hx-target="#results" hx-push-url="true"
+        hx-trigger="change, keyup changed delay:300ms from:#q, search from:#q">
+    <div>
+      <label for="q" class="label">Find a company</label>
+      <input id="q" type="search" name="q" value="{{ page.q or '' }}"
+             placeholder="Name, domain or AS number" autocomplete="off">
+    </div>
+
+    <div>
+      <span class="label">Quick views</span>
+      <div class="quick">
+        {% for label, qs in quick_views %}<a href="/?{{ qs }}">{{ label }}</a>{% endfor %}
+      </div>
+    </div>
+
+    <fieldset>
+      <legend>Are we sure it's them?</legend>
+      <label class="ck"><input type="checkbox" name="confidence" value="High"
+        {% if "High" in page.confidence %}checked{% endif %}>
+        <span>High confidence only</span><span class="cnt">{{ counts.high | num }}</span></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>How serious</legend>
+      <label class="ck"><input type="checkbox" name="could_give_full_control" value="true"
+        {% if page.could_give_full_control %}checked{% endif %}>
+        <span>Would give an attacker full control</span><span class="cnt">{{ counts.could_give_full_control | num }}</span></label>
+      <label class="ck"><input type="checkbox" name="attacked_in_the_wild" value="true"
+        {% if page.attacked_in_the_wild %}checked{% endif %}>
+        <span>Attackers use this kind of hole</span><span class="cnt">{{ counts.attacked_in_the_wild | num }}</span></label>
+      <p class="help">About the kind of problem, not an attack on this company.</p>
+      <label class="ck"><input type="checkbox" name="already_breached" value="true"
+        {% if page.already_breached %}checked{% endif %}>
+        <span>Signs of a break-in</span><span class="cnt">{{ counts.already_breached | num }}</span></label>
+      <p class="help">Someone has already locked, wiped or tampered with data here.</p>
+    </fieldset>
+
+    <fieldset id="problems">
+      {% include "_shortlist.html" %}
+    </fieldset>
+
+    <fieldset>
+      <legend>Rank by</legend>
+      {% for key, (name, hint) in scorers.items() %}
+        <label class="ck"><input type="radio" name="scorer" value="{{ key }}"
+          {% if key == result.scorer %}checked{% endif %}>
+          <span>{{ name }}<br><span class="small muted">{{ hint }}</span></span></label>
+      {% endfor %}
+    </fieldset>
+    <noscript><button type="submit">Apply</button></noscript>
+  </form>
+
+  <section id="results" aria-live="polite">
+    {% include "_results.html" %}
+  </section>
+</div>
+{% endblock %}

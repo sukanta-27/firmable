@@ -1,0 +1,25 @@
+{% macro confidence_badge(confidence, route, short=False) -%}
+  {%- set text, why = badge(confidence, route) -%}
+  <span class="badge {{ confidence }}" title="{{ why }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro threat_tags(t) -%}
+  {%- if t -%}
+    {%- if t.finding_type in ("ransom_note", "tag_compromised") -%}
+      <span class="tag alarm">Signs of a break-in</span>
+    {%- endif -%}
+    {%- if t.severity == 3 -%}<span class="tag">Would give an attacker full control</span>{%- endif -%}
+    {%- if t.exploitation_final == "active" -%}<span class="tag">Attackers use this kind of hole</span>{%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro score_tag(score) -%}
+  {%- if score is none -%}<span class="tag">Not scored yet</span>
+  {%- else -%}<span class="tag {% if score >= 9 %}score-high{% endif %}">Score {{ score }} of 12</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro provenance(command, ran_at, extra=None) -%}
+  <p class="prov">Produced by <code class="plain">{{ command }}</code>
+    · ran {{ ran_at.strftime("%-d %b %Y, %H:%M UTC") }}{% if extra %} · {{ extra }}{% endif %}</p>
+{%- endmacro %}

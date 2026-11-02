@@ -1,0 +1,79 @@
+{% from "_macros.html" import confidence_badge, threat_tags %}
+{% set first = page.offset + 1 %}
+{% set last = page.offset + result["items"] | length %}
+<div class="result-head">
+  <div>
+    <div class="count">{{ result.total | num }} {{ "company" if result.total == 1 else "companies" }}</div>
+    <div class="muted small">
+      {% if result.total %}Most urgent first · showing {{ first | num }}–{{ last | num }} · {% endif %}ranked by {{ scorers[result.scorer][0] | lower }}
+    </div>
+  </div>
+  {% if result.total %}
+    <a role="button" href="/api/companies.csv?{{ query }}" download>Export CSV · {{ result.total | num }} rows</a>
+  {% else %}
+    <a role="button" class="secondary outline" aria-disabled="true">Export CSV · nothing to export</a>
+  {% endif %}
+</div>
+
+{% if chips %}
+  <div class="chips">
+    {% for c in chips %}<a class="chip" href="{{ c.href }}">{{ c.label }} <span class="x" aria-label="Remove">✕</span></a>{% endfor %}
+    <a href="/" class="small">Clear all</a>
+  </div>
+{% else %}
+  <p class="status">No filters. Showing everyone, most urgent first.</p>
+{% endif %}
+
+{% if not result.total %}
+  <div class="notice">
+    <p><strong>No companies match {% if chips | length > 1 %}these {{ chips | length }} filters{% else %}this filter{% endif %}.</strong></p>
+    <p>Filters combine: a company has to meet every one. Try removing one.</p>
+    {% if remove_last %}<a role="button" href="{{ remove_last }}">Remove the last filter ({{ chips[-1].label }})</a>{% endif %}
+    <a role="button" class="secondary outline" href="/">Clear all filters</a>
+  </div>
+{% else %}
+  {% set ns = namespace(divided=false) %}
+  <ol class="rows">
+  {% for r in result["items"] %}
+    {% if r.rank is none and not ns.divided %}
+      {% set ns.divided = true %}
+      </ol>
+      <p class="divider"><strong>Not ranked yet.</strong> We found problems here but haven't assessed that kind of problem yet, so these come last.</p>
+      <ol class="rows">
+    {% endif %}
+    {% set w = r.worst_finding %}
+    {% set t = types.get(w.finding_type) if w else none %}
+    <li class="row">
+      <div class="rk">{% if r.rank is none %}<span class="tag">Not ranked</span>{% else %}{{ r.rank | num }}{% endif %}</div>
+      <div>
+        <div class="rtop">
+          <a class="cname" href="/companies/{{ r.company_key | urlencode }}?{{ list_query }}">{{ r.company_name or r.company_key }}</a>
+          {% if r.company_name and r.company_name != r.company_key %}<span class="mono muted">{{ r.company_key }}</span>{% endif %}
+          {{ confidence_badge(r.confidence, r.confidence_route) }}
+        </div>
+        <p class="line">{{ (w.salesperson_line if w else none) or UNSCORED_LINE }}</p>
+        <div class="tags">{{ threat_tags(t) }}</div>
+      </div>
+      <div class="meta">
+        <strong>{{ r.distinct_finding_types }} {{ "problem" if r.distinct_finding_types == 1 else "problems" }}</strong><br>
+        {% set visible = (r.services_with_finding / r.finding_share) | round | int if r.finding_share else r.services_with_finding %}
+        <span class="muted">on {{ r.services_with_finding | num }} of {{ visible | num }} {{ "service" if visible == 1 else "services" }}</span>
+      </div>
+    </li>
+  {% endfor %}
+  </ol>
+
+  {% if pages | length > 1 %}
+  <nav class="pager" aria-label="Pages">
+    {% for n in pages %}
+      {% if n is none %}<span class="muted">…</span>
+      {% elif n == current_page %}<span class="cur" aria-current="page">{{ n }}</span>
+      {% else %}<a href="/?{{ query }}{% if query %}&{% endif %}offset={{ (n - 1) * page_size }}"
+           hx-get="/?{{ query }}{% if query %}&{% endif %}offset={{ (n - 1) * page_size }}"
+           hx-target="#results" hx-push-url="true" hx-swap="innerHTML show:#results:top">{{ n }}</a>
+      {% endif %}
+    {% endfor %}
+    <span class="muted small">{{ page_size }} per page</span>
+  </nav>
+  {% endif %}
+{% endif %}
