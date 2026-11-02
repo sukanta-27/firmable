@@ -19,7 +19,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from api import auth, companies, company, how_we_know, scan
 from api.pages import company as company_pages
-from api.pages import leads, login
+from api.pages import leads, login, report
 from api.pages.common import LoginRequired, login_url, templates
 from api.settings import ApiSettings
 
@@ -101,6 +101,7 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     app.include_router(login.router)
     app.include_router(leads.router)
     app.include_router(company_pages.router)
+    app.include_router(report.router)
 
     @app.exception_handler(LoginRequired)
     def to_login(request: Request, _: LoginRequired) -> Response:

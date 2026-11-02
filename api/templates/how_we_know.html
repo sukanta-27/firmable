@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% from "_macros.html" import provenance %}
+{% block title %}How we know · Exposure leads{% endblock %}
+
+{% macro not_run(section) %}
+  <div class="notrun"><span class="tag">Not run</span>
+    Not run. To produce it, run <code class="plain">{{ section.command }}</code>.</div>
+{% endmacro %}
+
+{% block content %}
+<div class="report-layout">
+  <nav class="toc" aria-label="On this page">
+    <strong class="small">On this page</strong>
+    <ul>
+      <li><a href="#coverage">Can we tie services to companies?</a></li>
+      <li><a href="#cases">Test cases</a></li>
+      <li><a href="#scores">Are the finding scores right?</a></li>
+      <li><a href="#ranking">Comparing the ranking rules</a></li>
+    </ul>
+    <p class="small muted">For the scan received {{ scan.received_at.strftime("%-d %b %Y") }}.</p>
+  </nav>
+
+  <div class="report">
+    <hgroup>
+      <h1>How we know</h1>
+      <p>Why you can trust this list, and where it's weak. Each section says which command produced its numbers and when it ran.</p>
+    </hgroup>
+
+    {# 1. Coverage #}
+    {% set cov = r.attribution_coverage %}
+    {% set m = cov.metrics %}
+    <section id="coverage">
+      <h2>1. Can we tie services to companies?</h2>
+      {{ provenance(cov.command, cov.ran_at) }}
+      <p class="answer">Among the services with a problem, we tied <strong>{{ m.get("with_signal.attributed", 0) | num }}</strong> to a company.
+        <strong>{{ m.get("with_signal.unknown", 0) | num }}</strong> we couldn't tie to anyone, so they never reach the list.</p>
+      <table class="report">
+        <thead><tr><th></th><th class="num">All scanned services</th><th class="num">Services with a problem</th></tr></thead>
+        <tbody>
+          {% for level in ("High", "Medium", "Low") %}
+            <tr><td>Tied, {{ level }} confidence</td>
+              <td class="num">{{ m.get("all.confidence." ~ level, 0) | num }}</td>
+              <td class="num">{{ m.get("with_signal.confidence." ~ level, 0) | num }}</td></tr>
+          {% endfor %}
+          <tr><td><strong>Tied to a company</strong></td><td class="num">{{ m.get("all.attributed", 0) | num }}</td><td class="num">{{ m.get("with_signal.attributed", 0) | num }}</td></tr>
+          <tr><td><strong>Couldn't tie</strong></td><td class="num">{{ m.get("all.unknown", 0) | num }}</td><td class="num">{{ m.get("with_signal.unknown", 0) | num }}</td></tr>
+        </tbody>
+      </table>
+      <h3>By how we tied them</h3>
+      <table class="report">
+        <thead><tr><th>Route</th><th>In plain words</th><th class="num">Services with a problem</th></tr></thead>
+        <tbody>
+          {% for route, words in (("scan_hostname", "Reached through the company's own hostname"),
+                                  ("server_name", "A Windows login or directory reply named the company domain"),
+                                  ("reverse_dns", "The address's reverse name is under the company domain"),
+                                  ("network", "The address block is registered to the organisation itself")) %}
+            <tr><td><code class="plain">{{ route }}</code></td><td>{{ words }}</td><td class="num">{{ m.get("with_signal.route." ~ route, 0) | num }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {# 2. Test cases #}
+    {% set sec = r.attribution_cases %}
+    <section id="cases">
+      <h2>2. Test cases</h2>
+      {% if sec.report %}
+        {% set rep = sec.report %}
+        {{ provenance(rep.stamp.command, rep.stamp.ran_at, "rule " ~ rep.strategy) }}
+        <p class="answer">{{ rep.by_case | length }} made-up but realistic situations with a known right answer. We run the tying rule on them and count:
+          <strong>{{ rep.total.right | num }} right</strong>, <strong>{{ rep.total.missed | num }} missed</strong> (not tied), <strong>{{ rep.total.wrong | num }} wrong company</strong>.</p>
+        {% set cases = rep.by_case | dictsort %}
+        {% set flagged = cases | selectattr("1.wrong") | list + cases | rejectattr("1.wrong") | selectattr("1.missed") | list %}
+        {% set clean = cases | rejectattr("1.wrong") | rejectattr("1.missed") | list %}
+        <table class="report">
+          <thead><tr><th>Situation</th><th class="num">Right</th><th class="num">Missed</th><th class="num">Wrong</th><th>Note</th></tr></thead>
+          <tbody>
+            {% for name, t in flagged %}
+              <tr class="flag"><td>{{ case_name(name) }}</td><td class="num">{{ t.right }}</td><td class="num">{{ t.missed }}</td><td class="num">{{ t.wrong }}</td>
+                <td>{% if t.wrong %}Has wrong answers{% else %}Has misses{% endif %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if clean %}
+          <details>
+            <summary>{{ clean | length }} more cases, all right</summary>
+            <table class="report"><tbody>
+              {% for name, t in clean %}<tr><td>{{ case_name(name) }}</td><td class="num">{{ t.right }} right</td></tr>{% endfor %}
+            </tbody></table>
+          </details>
+        {% endif %}
+        <h3>Totals by the confidence we gave</h3>
+        <table class="report">
+          <thead><tr><th>Confidence given</th><th class="num">Right</th><th class="num">Missed</th><th class="num">Wrong</th></tr></thead>
+          <tbody>
+            {% for level in ("High", "Medium", "Low", "unknown") if level in rep.by_confidence %}
+              {% set t = rep.by_confidence[level] %}
+              <tr><td>{{ "Unknown (not tied to a company)" if level == "unknown" else level }}</td>
+                <td class="num">{{ t.right }}</td><td class="num">{{ t.missed }}</td><td class="num">{{ t.wrong }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}{{ not_run(sec) }}{% endif %}
+    </section>
+
+    {# 3. Finding scores #}
+    {% set sec = r.finding_scores %}
+    <section id="scores">
+      <h2>3. Are the finding scores right?</h2>
+      {% if sec.report %}
+        {% set rep = sec.report %}
+        <p class="answer">An AI model answered the same fixed questions for every kind of problem; the list is scored with
+          <strong>{{ model_name(rep.answers_model) }}</strong>'s answers. Here we check them against an outside list and against other models.</p>
+        <h3>Against KEV, the US government's list of flaws known to be exploited</h3>
+        {{ provenance(rep.stamp.command, rep.stamp.ran_at, "KEV catalogue " ~ (rep.kev_catalog_version or "unknown") ~ " · prompt " ~ rep.prompt_version) }}
+        <p class="small muted">Counted over the problems that are CVEs: does the model say criminals use it, and is it on KEV?</p>
+        <table class="report">
+          <thead><tr><th>Model</th><th class="num">Both say exploited</th><th class="num">Model only</th><th class="num">KEV only</th><th class="num">Neither</th></tr></thead>
+          <tbody>
+            {% for mc in rep.models %}
+              <tr><td>{{ model_name(mc.model) }}{% if mc.model == rep.answers_model %} <span class="small muted">(used for the list)</span>{% endif %}</td>
+                <td class="num">{{ mc.kev_both }}</td><td class="num">{{ mc.kev_model_only }}</td><td class="num">{{ mc.kev_only }}</td><td class="num">{{ mc.kev_neither }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% for mc in rep.models if mc.kev_disagreements %}
+          <details>
+            <summary>{{ model_name(mc.model) }}: {{ mc.kev_disagreements | length }} disagreement{{ "s" if mc.kev_disagreements | length != 1 }} with KEV</summary>
+            <table class="report"><thead><tr><th>Problem</th><th>Model said</th><th>KEV</th></tr></thead><tbody>
+              {% for d in mc.kev_disagreements %}<tr><td><code class="plain">{{ d.item_id }}</code></td><td>{{ d.exploitation }}</td><td>{{ "listed" if d.on_kev else "not listed" }}</td></tr>{% endfor %}
+            </tbody></table>
+          </details>
+        {% endfor %}
+
+        {% if rep.agreement %}
+          <h3>Between models</h3>
+          <p class="small muted">Each other model compared with {{ model_name(rep.answers_model) }}, over the problems both answered.</p>
+          <table class="report">
+            <thead><tr><th>Question</th>{% for a in rep.agreement %}<th class="num">{{ model_name(a.reference) }} vs {{ model_name(a.other) }}</th>{% endfor %}</tr></thead>
+            <tbody>
+              {% for q, label in questions.items() %}
+                <tr><td>{{ label }} <span class="mono muted">{{ q }}</span></td>
+                  {% for a in rep.agreement %}
+                    {% set qa = a.questions | selectattr("question", "equalto", q) | first %}
+                    <td class="num">{% if qa %}{{ qa.agree }} of {{ qa.both_answered }}{% else %}–{% endif %}</td>
+                  {% endfor %}</tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% for a in rep.agreement %}
+            {% set diffs = a.questions | map(attribute="disagreements") | sum(start=[]) %}
+            {% if diffs %}
+              <details>
+                <summary>{{ model_name(a.reference) }} vs {{ model_name(a.other) }}: {{ diffs | length }} disagreements</summary>
+                <table class="report"><thead><tr><th>Question</th><th>Problem</th><th>{{ model_name(a.reference) }}</th><th>{{ model_name(a.other) }}</th></tr></thead><tbody>
+                  {% for qa in a.questions %}{% for d in qa.disagreements %}
+                    <tr><td>{{ qa.question }}</td><td><code class="plain">{{ d.item_id }}</code></td><td>{{ d.reference }}</td><td>{{ d.other }}</td></tr>
+                  {% endfor %}{% endfor %}
+                </tbody></table>
+              </details>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% else %}{{ not_run(sec) }}{% endif %}
+    </section>
+
+    {# 4. Ranking #}
+    {% set sec = r.ranking %}
+    <section id="ranking">
+      <h2>4. Comparing the ranking rules</h2>
+      {% if sec.report %}
+        {% set rep = sec.report %}
+        <p class="boxed">{{ rep.note }}</p>
+        {{ provenance(rep.stamp.command, rep.stamp.ran_at) }}
+        <p class="answer"><strong>Worst single problem</strong> (the usual list) ranks a company by its worst problem.
+          <strong>Problems add up</strong> adds them together, so large organisations rise.
+          {% if rep.top_100_shared is not none %}<strong>{{ rep.top_100_shared }}</strong> of the top 100 are the same under both.{% endif %}</p>
+        {% if rep.biggest_moves %}
+          <h3>Companies that move most</h3>
+          <table class="report">
+            <thead><tr><th>Company</th><th class="num">Worst single problem</th><th class="num">Problems add up</th></tr></thead>
+            <tbody>
+              {% for p in rep.biggest_moves %}
+                <tr><td><a href="/companies/{{ p.company_key | urlencode }}">{{ p.company_name or p.company_key }}</a></td>
+                  <td class="num">{{ p.rank_first | num if p.rank_first is not none else "Not ranked" }}</td>
+                  <td class="num">{{ p.rank_second | num if p.rank_second is not none else "Not ranked" }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
+        {% if rep.victims %}
+          {% set v = rep.victims %}
+          <h3>Cross-check: known ransomware victims</h3>
+          <p>Of {{ v.victim_domains | num }} public ransomware victim domains, <strong>{{ v.matched }}</strong> are companies in our list, {{ v.ranked }} of them ranked.</p>
+          {% if v.companies %}
+            <table class="report">
+              <thead><tr><th>Company</th><th class="num">Worst single problem</th><th class="num">Problems add up</th></tr></thead>
+              <tbody>
+                {% for p in v.companies %}
+                  <tr><td><a href="/companies/{{ p.company_key | urlencode }}">{{ p.company_name or p.company_key }}</a></td>
+                    <td class="num">{{ p.rank_first | num if p.rank_first is not none else "Not ranked" }}</td>
+                    <td class="num">{{ p.rank_second | num if p.rank_second is not none else "Not ranked" }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% endif %}
+          <p class="source">Source: {{ v.source }} · as of {{ v.as_of }}</p>
+        {% endif %}
+      {% else %}{{ not_run(sec) }}{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

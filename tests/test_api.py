@@ -376,6 +376,10 @@ def test_how_we_know_marks_a_report_never_run_as_not_run(client: TestClient) -> 
     sections = ("attribution_cases", "finding_scores", "ranking", "llm_usage")
     assert {body[s]["status"] for s in sections} == {"not_run"}
     assert body["attribution_coverage"]["metrics"]
+    # The page shows three of those sections; AI cost is for the write-up, not the page.
+    html = client.get("/how-we-know")
+    assert html.status_code == 200
+    assert html.text.count('class="notrun"') == 3
 
 
 def test_how_we_know_serves_each_report_as_the_pipeline_wrote_it(
@@ -429,6 +433,12 @@ def test_how_we_know_serves_each_report_as_the_pipeline_wrote_it(
     with app_on(settings.publish_root) as client:
         log_in(client)
         body = client.get("/api/how-we-know").json()
+        html = client.get("/how-we-know").text
+    # Both are fixed text: the note keeps the comparison from reading as a result, and the
+    # source line is ransomware.live's condition for showing its data.
+    assert "Illustration, not a measurement." in html
+    assert "Source: Ransomware.live (https://www.ransomware.live)" in html
+    assert 'class="notrun"' not in html
     for section, name in (
         ("attribution_cases", "attribution"),
         ("finding_scores", "finding_scores_check"),
