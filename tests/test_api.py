@@ -1,8 +1,11 @@
+import csv
+import io
 import json
 import re
 from collections.abc import Iterator
 from pathlib import Path
 
+import duckdb
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
@@ -19,6 +22,7 @@ from tests.helpers import run, variant
 
 RECORDS = (Path(__file__).parent / "fixtures" / "signal_records.jsonl").read_text().splitlines()
 PASSWORD = "correct horse"
+FORMULA = '=HYPERLINK("http://evil.example","Click")'
 
 
 def record(shodan_id: str, hostname: str | None = None, **changes: object) -> str:
@@ -72,7 +76,16 @@ def published(tmp_path_factory: pytest.TempPathFactory) -> Path:
             scanned(
                 variant(smbghost, 9, ip_str="176.43.141.149", ip=2955644309), "share.thirdco.com"
             ),  # an unscored CVE only: no rank
+            variant(
+                next(r for r in RECORDS if '"51215953' in r),
+                11,
+                ip_str="115.243.88.183",
+                ip=1945327799,
+                asn="AS64500",
+                org=FORMULA,
+            ),  # a company-owned network, named after its scan `org` string
         ],
+        networks=[("AS0", ["NSP"]), ("AS64500", ["Enterprise"])],
     )
     asdb = root / "ref" / "asdb" / "as_of=2026-03"
     asdb.mkdir(parents=True)
@@ -158,3 +171,52 @@ def test_failed_logins_lock_out_one_client_ip_not_everyone(client: TestClient) -
         assert bad.status_code == 401
     assert client.post("/api/auth/login", json=right, headers=attacker).status_code == 429
     assert client.post("/api/auth/login", json=right, headers=colleague).status_code == 204
+
+
+def companies(client: TestClient, **params: str | int) -> list[str]:
+    response = client.get("/api/companies", params={"limit": 200, **params})
+    assert response.status_code == 200, response.text
+    return [c["company_key"] for c in response.json()["items"]]
+
+
+def test_list_order_is_gold_rank_under_each_scorer(client: TestClient, published: Path) -> None:
+    log_in(client)
+    orders = {}
+    for scorer in ("worst_x_confidence_v1", "sum_x_confidence_v1"):
+        gold_order = duckdb.execute(
+            f"SELECT company_key FROM '{published}/company.parquet' "
+            "WHERE company_scorer = ? ORDER BY rank NULLS LAST, company_key",
+            [scorer],
+        ).fetchall()
+        orders[scorer] = companies(client, scorer=scorer)
+        assert orders[scorer] == [k for (k,) in gold_order]
+    assert orders["worst_x_confidence_v1"] != orders["sum_x_confidence_v1"]
+    last = client.get("/api/companies", params={"limit": 200}).json()["items"][-1]
+    assert (last["company_key"], last["rank"]) == ("thirdco.com", None)
+
+
+def test_each_filter_keeps_only_matching_companies(client: TestClient) -> None:
+    log_in(client)
+    everyone = companies(client)
+    high = client.get("/api/companies", params={"confidence": "High", "limit": 200}).json()
+    assert {c["confidence"] for c in high["items"]} == {"High"}
+    assert len(high["items"]) < len(everyone), "the fixture needs a non-High company"
+    assert set(companies(client, finding_type="ftp_anonymous")) == {"otherco.com", "breached.com"}
+    assert companies(client, already_breached="true") == ["breached.com"]
+
+
+def test_csv_holds_the_list_in_the_same_order(client: TestClient) -> None:
+    log_in(client)
+    params = {"scorer": "sum_x_confidence_v1", "attacked_in_the_wild": "true"}
+    response = client.get("/api/companies.csv", params=params)
+    assert response.status_code == 200
+    rows = list(csv.DictReader(io.StringIO(response.text)))
+    assert [r["company_key"] for r in rows] == companies(client, **params)
+    assert {r["scorer"] for r in rows} == {"sum_x_confidence_v1"}
+
+
+def test_csv_cells_cannot_run_as_spreadsheet_formulas(client: TestClient) -> None:
+    log_in(client)
+    rows = list(csv.DictReader(io.StringIO(client.get("/api/companies.csv").text)))
+    names = {r["company_key"]: r["company_name"] for r in rows}
+    assert names["AS64500"] == "'" + FORMULA
