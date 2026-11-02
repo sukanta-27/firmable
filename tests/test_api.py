@@ -220,3 +220,30 @@ def test_csv_cells_cannot_run_as_spreadsheet_formulas(client: TestClient) -> Non
     rows = list(csv.DictReader(io.StringIO(client.get("/api/companies.csv").text)))
     names = {r["company_key"]: r["company_name"] for r in rows}
     assert names["AS64500"] == "'" + FORMULA
+
+
+def test_company_page_shows_every_finding_gold_has_for_the_company(
+    client: TestClient, published: Path
+) -> None:
+    log_in(client)
+    keys = duckdb.execute(
+        f"SELECT DISTINCT company_key FROM '{published}/company.parquet' ORDER BY 1"
+    ).fetchall()
+    for (key,) in keys:
+        page = client.get(f"/api/companies/{key}")
+        assert page.status_code == 200, key
+        shown = sorted(
+            (f["finding_type"], s["ip"], s["port"])
+            for f in page.json()["findings"]
+            for s in f["services"]
+        )
+        in_gold = duckdb.execute(
+            f"SELECT finding_type, ip, port FROM '{published}/company_finding.parquet' "
+            "WHERE company_key = ? ORDER BY ALL",
+            [key],
+        ).fetchall()
+        assert shown == [tuple(r) for r in in_gold], key
+    unscored = client.get("/api/companies/thirdco.com").json()
+    assert unscored["rank"] is None
+    assert [f["score"] for f in unscored["findings"]] == [None]
+    assert client.get("/api/companies/nobody.example").status_code == 404

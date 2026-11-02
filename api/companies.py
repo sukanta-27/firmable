@@ -68,11 +68,14 @@ def chosen_scorer(request: Request, scorer: str | None) -> str:
 
 
 def matching(
-    cur: duckdb.DuckDBPyConnection, filters: Filters, scorer: str
+    cur: duckdb.DuckDBPyConnection, filters: Filters, scorer: str, company_key: str | None = None
 ) -> duckdb.DuckDBPyRelation:
     """The companies that pass every filter, in gold's rank order, unranked ones last."""
     where = ["c.company_scorer = $scorer"]
     params: dict[str, Any] = {"scorer": scorer}
+    if company_key is not None:
+        where.append("c.company_key = $company_key")
+        params["company_key"] = company_key
     has = "EXISTS (SELECT 1 FROM company_finding f WHERE f.company_key = c.company_key AND {})"
     if filters.confidence:
         where.append("list_contains($confidence, c.confidence)")
