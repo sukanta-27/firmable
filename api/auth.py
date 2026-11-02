@@ -1,6 +1,7 @@
 import threading
 import time
 from collections import defaultdict, deque
+from typing import Literal
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
@@ -68,25 +69,37 @@ def current_user(request: Request) -> str:
     return username
 
 
-@router.post("/login", status_code=204)
-def login(body: Login, request: Request) -> Response:
+def attempt_login(
+    request: Request, username: str, password: str
+) -> Literal["ok", "wrong", "throttled"]:
+    """Checks the throttle and the password, and starts the session on success."""
     settings: ApiSettings = request.app.state.settings
     throttle: Throttle = request.app.state.throttle
     ip = client_ip(request)
     window = settings.login_window_minutes * 60
     if throttle.refused(ip, settings.login_max_failures, window):
-        raise HTTPException(status_code=429, detail="too many failed logins; try again later")
-    known = body.username in settings.app_users
+        return "throttled"
+    known = username in settings.app_users
     try:
-        hasher.verify(settings.app_users.get(body.username, UNKNOWN_USER_HASH), body.password)
+        hasher.verify(settings.app_users.get(username, UNKNOWN_USER_HASH), password)
         valid = known
     except VerificationError:
         valid = False
     if not valid:
         throttle.failed(ip)
-        raise HTTPException(status_code=401, detail="wrong username or password")
+        return "wrong"
     throttle.succeeded(ip)
-    request.session["user"] = body.username
+    request.session["user"] = username
+    return "ok"
+
+
+@router.post("/login", status_code=204)
+def login(body: Login, request: Request) -> Response:
+    outcome = attempt_login(request, body.username, body.password)
+    if outcome == "throttled":
+        raise HTTPException(status_code=429, detail="too many failed logins; try again later")
+    if outcome == "wrong":
+        raise HTTPException(status_code=401, detail="wrong username or password")
     return Response(status_code=204)
 
 

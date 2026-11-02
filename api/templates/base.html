@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}Exposure leads{% endblock %}</title>
+  <link rel="stylesheet" href="/static/pico.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="appbar">
+    <nav class="container-fluid">
+      <ul>
+        <li><a href="/" class="logo">Exposure leads</a></li>
+        <li><a href="/" {% if active == "leads" %}aria-current="page"{% endif %}>Leads</a></li>
+        <li><a href="/how-we-know" {% if active == "how" %}aria-current="page"{% endif %}>How we know</a></li>
+      </ul>
+      <ul>
+        <li class="muted">Signed in as <strong>{{ user }}</strong></li>
+        <li>
+          <form method="post" action="/logout" class="inline">
+            <button type="submit" class="secondary outline small-btn">Log out</button>
+          </form>
+        </li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container-fluid" id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="container-fluid site-footer">
+    <span>Scan received {{ scan.received_at.strftime("%-d %b %Y") }}
+      · published {{ scan.published_at.strftime("%-d %b %Y") }}</span>
+    <details class="about">
+      <summary>About this scan</summary>
+      <dl>
+        <dt>Scan received</dt>
+        <dd>{{ scan.received_at.strftime("%-d %b %Y") }}{% if scan.records %} · {{ scan.records | num }} records{% endif %}</dd>
+        <dt>List published</dt><dd>{{ scan.published_at.strftime("%-d %b %Y, %H:%M UTC") }}</dd>
+        <dt>Tying rule</dt><dd><code>{{ scan.attributor }}</code></dd>
+        <dt>Finding scores</dt><dd><code>{{ scan.finding_scorer }}</code>, answers by <code>{{ scan.answers_model }}</code>, prompt <code>{{ scan.prompt_version }}</code></dd>
+        <dt>Ranking rules</dt><dd>{% for s in scan.company_scorers %}<code>{{ s }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+        <dt>KEV catalogue</dt><dd>{{ scan.kev_catalog_version }}</dd>
+        <dt>ASdb</dt><dd>{{ scan.asdb_as_of }}</dd>
+        <dt>Scan file</dt><dd><code>{{ scan.file_id[:12] }}…</code></dd>
+      </dl>
+    </details>
+    <a href="/how-we-know">How we know</a>
+  </footer>
+</body>
+</html>

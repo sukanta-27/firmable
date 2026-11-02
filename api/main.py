@@ -8,13 +8,18 @@ import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 
 import duckdb
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from api import auth, companies, company, how_we_know, scan
+from api.pages import leads, login
+from api.pages.common import LoginRequired, login_url, templates
 from api.settings import ApiSettings
 
 PUBLISHED_TABLES = ("company", "company_finding")
@@ -91,4 +96,26 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     protected.include_router(scan.router)
     protected.include_router(how_we_know.router)
     app.include_router(protected)
+
+    app.include_router(login.router)
+    app.include_router(leads.router)
+
+    @app.exception_handler(LoginRequired)
+    def to_login(request: Request, _: LoginRequired) -> Response:
+        target = login_url(request)
+        if request.headers.get("hx-request"):
+            # A 200, so htmx acts on the header whatever its error settings; a redirect
+            # would be followed inside the swap and draw the login form in the results.
+            return Response(status_code=200, headers={"HX-Redirect": target})
+        return RedirectResponse(target, status_code=303)
+
+    @app.exception_handler(500)
+    def server_error(request: Request, _: Exception) -> Response:
+        if request.url.path.startswith("/api"):
+            return JSONResponse({"detail": "internal server error"}, status_code=500)
+        return templates.TemplateResponse(
+            request, "error.html", {"full": not request.headers.get("hx-request")}, 500
+        )
+
+    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), "static")
     return app

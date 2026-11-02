@@ -147,18 +147,45 @@ def log_in(client: TestClient) -> None:
     assert response.status_code == 204
 
 
-PUBLIC = {"/api/health", "/api/auth/login", "/api/auth/logout"}
+PUBLIC = {"/api/health", "/api/auth/login", "/api/auth/logout", "/login", "/logout"}
 
 
-def test_every_data_route_refuses_a_request_without_a_session(client: TestClient) -> None:
+def test_every_page_and_data_route_refuses_a_request_without_a_session(
+    client: TestClient,
+) -> None:
     # The OpenAPI schema lists every route, however deeply its router is included, so a new
-    # route that misses the login router fails here.
+    # route that misses the login dependency fails here.
     paths = client.get("/openapi.json").json()["paths"]
     protected = [(m, p) for p, ops in paths.items() if p not in PUBLIC for m in ops]
-    assert protected, "the walk found no protected route, so it would pass vacuously"
+    assert any(p.startswith("/api") for _, p in protected), "no data route found"
+    assert any(not p.startswith("/api") for _, p in protected), "no page route found"
     for method, path in protected:
         concrete = re.sub(r"\{[^}]+\}", "x", path)
-        assert client.request(method, concrete).status_code == 401, f"{method} {path}"
+        response = client.request(method, concrete, follow_redirects=False)
+        if path.startswith("/api"):
+            assert response.status_code == 401, f"{method} {path}"
+            continue
+        assert response.status_code == 303, f"{method} {path}"
+        assert response.headers["location"].startswith("/login?next="), path
+        # Mid-use, the request is HTMX: a redirect would draw the login form inside the
+        # results, so the whole page has to be told to go.
+        swap = client.request(method, concrete, headers={"HX-Request": "true"})
+        assert swap.status_code == 200, f"{method} {path}"
+        assert swap.headers["hx-redirect"].startswith("/login?next="), path
+    assert client.get("/static/app.js").status_code == 200
+
+
+def test_login_never_redirects_off_site(client: TestClient) -> None:
+    def lands(next_: str) -> str:
+        form = {"username": "rep", "password": PASSWORD, "next": next_}
+        response = client.post("/login", data=form, follow_redirects=False)
+        assert response.status_code == 303
+        client.cookies.clear()
+        return str(response.headers["location"])
+
+    for hostile in ("//evil.example", "https://evil.example", "/\\evil.example"):
+        assert lands(hostile) == "/", hostile
+    assert lands("/?q=acme") == "/?q=acme"
 
 
 def test_login_reveals_nothing_about_which_usernames_exist(client: TestClient) -> None:

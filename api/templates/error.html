@@ -1,0 +1,18 @@
+{% if full %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Something went wrong · Exposure leads</title>
+  <link rel="stylesheet" href="/static/pico.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body><main class="container">
+{% endif %}
+<div class="notice" role="alert">
+  <p><strong>We couldn't load this just now.</strong></p>
+  <p>Trying again usually works. Your filters are kept in the address bar.</p>
+  <a href="" role="button" class="secondary">Try again</a>
+  <a href="/" role="button" class="secondary outline">All leads</a>
+</div>
+{% if full %}</main></body></html>{% endif %}

@@ -6,7 +6,7 @@ Sales intelligence for a cybersecurity vendor: turn monthly Shodan banner dumps 
 
 ## Stack and commands
 
-Python 3.12, FastAPI, Pydantic v2, pydantic-settings, DuckDB over Parquet. Managed with `uv`; never `pip install` into `.venv`.
+Python 3.12, FastAPI, Pydantic v2, pydantic-settings, DuckDB over Parquet. The UI is Jinja2 templates with HTMX and Pico.css, served by the same FastAPI app. Managed with `uv`; never `pip install` into `.venv`.
 
 | Task | Command |
 |---|---|
@@ -38,7 +38,7 @@ Before saying work is done: `ruff check`, `mypy` and `pytest` pass, and you ran 
 |---|---|---|
 | `pipeline/` | Landing → bronze → silver → gold, and the `pipeline` CLI. Runs on our machine, never on the host | Each stage reads and writes Parquet tables, not Python objects |
 | `api/` | FastAPI app. Reads gold Parquet through DuckDB, read-only | Thin: query, validate, return. Never imports `pipeline/`, which the deployed image doesn't hold. `api/reports.py` is the eval reports' schema: the pipeline imports it to write them, so it stays plain Pydantic |
-| `web/` | React + Vite frontend, built into static files that `api/` serves | |
+| `api/templates/` | Jinja2 pages and the fragments HTMX swaps in, rendered by page routes in `api/`. Pico.css is the base stylesheet. No Node build | A page route calls the same query function as its JSON route, never a second copy of the query |
 | `tests/` | Tests | See "Tests" below |
 | `docs/` | Findings, each number traceable to a script | Amend in place when wrong; never add a contradicting doc beside it |
 | `archive/` | Frozen exploration scripts that reproduce the numbers in `docs/` | **Read-only.** Never import from it. Copy what you need into `pipeline/` |
@@ -46,7 +46,7 @@ Before saying work is done: `ruff check`, `mypy` and `pytest` pass, and you ran 
 | `finding_scores/` | The AI's validated answers per finding type, which gold scores with. Committed | Written only by `pipeline ref finding-scores import` or `ask`. Never edited by hand |
 | `llm_usage/` | One row per LLM API call (`calls.jsonl`) and the totals over it. Committed | Append-only; written only by `pipeline/llm_usage.py` |
 
-`web/` doesn't exist yet. Create modules when the first code needs them, not ahead of it.
+`api/templates/` doesn't exist yet. Create modules when the first code needs them, not ahead of it.
 
 ## Data
 
