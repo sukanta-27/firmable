@@ -1,7 +1,8 @@
 """Gold: whose each service is, how bad each finding is, and who a salesperson calls first.
 
 Every table names the strategies that made it, so outputs of different strategies never mix
-unlabelled. Gold reads one file's silver partitions and never calls a model.
+unlabelled. Gold reads one file's silver partitions and its bronze CVE descriptions, and
+never calls a model.
 """
 
 import json
@@ -12,7 +13,7 @@ from pathlib import Path
 import duckdb
 
 from pipeline import stage
-from pipeline.gold import attribution, checks, company, finding
+from pipeline.gold import attribution, checks, company, company_finding, finding
 from pipeline.meta import (
     Check,
     Manifest,
@@ -29,6 +30,7 @@ STEPS: list[tuple[str, stage.Step[Settings], tuple[str, ...]]] = [
     ("attribution", attribution.build, ("attribution",)),
     ("finding", finding.build, ("finding",)),
     ("company", company.build, ("company",)),
+    ("company_finding", company_finding.build, ("company_finding",)),
 ]
 STEP_NAMES = [name for name, _, _ in STEPS]
 SILVER_TABLES = ["service", "address", "identity_evidence", "service_signal", "service_vuln"]
@@ -64,6 +66,11 @@ def build(manifest: Manifest, settings: Settings, start_at: str = STEP_NAMES[0])
         f"CREATE VIEW silver_{t} AS SELECT * FROM read_parquet("
         f"'{silver}/{t}/file_id={manifest.file_id}/*.parquet', hive_partitioning=false);\n"
         for t in SILVER_TABLES
+    )
+    cve_text = settings.data_root / "bronze" / "cve_text" / f"file_id={manifest.file_id}"
+    views += (
+        "CREATE VIEW bronze_cve_text AS SELECT * FROM read_parquet("
+        f"'{cve_text}/*.parquet', hive_partitioning=false);\n"
     )
     setup = views + asdb.view_sql(asdb_dir) + finding.setup_sql(settings)
 

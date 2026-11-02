@@ -8,7 +8,7 @@ from pipeline.gold import company
 from pipeline.gold.attribution import attribute
 from pipeline.ref import finding_scores
 from pipeline.settings import Settings
-from tests.helpers import run
+from tests.helpers import run, variant
 
 CASES = Path(__file__).parent / "eval" / "attribution_cases.json"
 
@@ -211,6 +211,9 @@ def test_gold_end_to_end_scores_ranks_and_reruns_cleanly(tmp_path: Path) -> None
             scanned_as(RDP, "remote.acmefreight.com"),
             scanned_as(FTP_ANONYMOUS, "files.otherco.com"),
             scanned_as(SMBGHOST, "share.cdnshop.com", tags=["cdn"]),
+            scanned_as(
+                variant(SMBGHOST, 9, ip_str="176.43.141.149", ip=2955644309), "share.thirdco.com"
+            ),
         ],
     )
     asdb = tmp_path / "ref" / "asdb" / "as_of=2026-03"
@@ -249,18 +252,43 @@ def test_gold_end_to_end_scores_ranks_and_reruns_cleanly(tmp_path: Path) -> None
     )
     gold.build(manifest, settings)
     findings = gold_rows(tmp_path, "finding", "finding_type, score")
-    assert "CVE-2020-0796" not in {t for t, _ in findings}
+    assert gold_rows(tmp_path, "finding", "count(*) FILTER (WHERE finding_type = 'CVE-2020-0796')")[
+        0
+    ] == (1,), "the CVE counts once: on thirdco, never on the CDN-tagged copy"
     assert ("rdp_exposed", 12) in findings
     assert ("ftp_anonymous", None) in findings
     assert gold_rows(tmp_path, "company", "company_scorer, company_key, rank") == [
         ("sum_x_confidence_v1", "acmefreight.com", 1),
         ("sum_x_confidence_v1", "otherco.com", None),
+        ("sum_x_confidence_v1", "thirdco.com", None),
         ("worst_x_confidence_v1", "acmefreight.com", 1),
         ("worst_x_confidence_v1", "otherco.com", None),
+        ("worst_x_confidence_v1", "thirdco.com", None),
     ]
     unlabelled = "attributor IS NULL OR finding_scorer IS NULL OR answers_model IS NULL"
     assert gold_rows(tmp_path, "company", f"count(*) FILTER (WHERE {unlabelled})") == [(0,)]
 
-    counts = {t: gold_rows(tmp_path, t, "count(*)") for t in ("attribution", "finding", "company")}
+    on_company = (
+        "SELECT f.service_key, f.finding_type FROM read_parquet('{g}/finding/*/*.parquet') f "
+        "JOIN read_parquet('{g}/attribution/*/*.parquet') a USING (service_key) "
+        "WHERE a.company_key IS NOT NULL ORDER BY ALL"
+    ).format(g=tmp_path / "data" / "gold")
+    assert gold_rows(tmp_path, "company_finding", "service_key, finding_type") == (
+        duckdb.execute(on_company).fetchall()
+    )
+    assert gold_rows(
+        tmp_path, "company", "DISTINCT company_key, confidence, confidence_route, top_finding_type"
+    )[0] == ("acmefreight.com", "High", "scan_hostname", "rdp_exposed")
+    assert gold_rows(
+        tmp_path, "company_finding", "finding_type, cve_summary IS NOT NULL, answer_status"
+    ) == [
+        ("CVE-2020-0796", True, None),
+        ("ftp_anonymous", False, None),
+        ("rdp_exposed", False, "answered"),
+        ("rdp_standard_security", False, None),
+    ]
+
+    tables = ("attribution", "finding", "company", "company_finding")
+    counts = {t: gold_rows(tmp_path, t, "count(*)") for t in tables}
     gold.build(manifest, settings)
     assert {t: gold_rows(tmp_path, t, "count(*)") for t in counts} == counts

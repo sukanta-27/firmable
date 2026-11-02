@@ -31,10 +31,11 @@ def _ranked(
     """Per company: the aggregate of (finding score x that service's confidence weight).
 
     Weighting per service, before aggregating, stops a High-confidence minor service lending
-    its weight to a Low-confidence critical one. The company's confidence is that of the
-    service with the highest weighted score. Ties: confidence, then distinct finding types,
-    then the share of the company's visible services with a finding, then the key, so every
-    run gives the same order.
+    its weight to a Low-confidence critical one. The company's confidence, its route and its
+    top finding come from one pick of the finding with the highest weighted score; picked
+    separately, a tie could pair one service's confidence with another's route. Rank ties:
+    confidence, then distinct finding types, then the share of the company's visible services
+    with a finding, then the key, so every run gives the same order.
     """
     weights = ", ".join(f"('{level}', {w})" for level, w in CONFIDENCE_WEIGHT.items())
     same_fault = ", ".join(f"('{k}', '{v}')" for k, v in SAME_FAULT.items())
@@ -46,8 +47,9 @@ def _ranked(
         w(confidence, weight) AS (VALUES {weights}),
         fault(finding_type, fault) AS (VALUES {same_fault}),
         f AS (
-          SELECT a.company_key, a.company_kind, a.company_name, a.confidence, w.weight,
-            a.attributor, f.service_key, f.score, f.finding_scorer, f.answers_model,
+          SELECT a.company_key, a.company_kind, a.company_name, a.confidence, a.route, w.weight,
+            a.attributor, f.service_key, f.finding_type, f.score, f.finding_scorer,
+            f.answers_model,
             coalesce(fault.fault, f.finding_type) AS fault,
             round(f.score * w.weight, 6) AS weighted
           FROM {stage.read(staging, "finding")} f
@@ -61,7 +63,8 @@ def _ranked(
             any_value(company_name) AS company_name,
             {aggregate}(weighted) AS ranking_score,
             {aggregate}(score) AS company_score,
-            arg_max(confidence, (coalesce(weighted, -1), weight)) AS confidence,
+            arg_max({{'confidence': confidence, 'route': route, 'finding_type': finding_type}},
+              (coalesce(weighted, -1), weight, service_key, finding_type)) AS top,
             count(DISTINCT fault) AS distinct_finding_types,
             count(DISTINCT service_key) AS services_with_finding,
             any_value(attributor) AS attributor,
@@ -73,11 +76,13 @@ def _ranked(
           CASE WHEN p.ranking_score IS NOT NULL THEN row_number() OVER (
             PARTITION BY p.ranking_score IS NULL
             ORDER BY p.ranking_score DESC,
-              CASE p.confidence WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 ELSE 3 END,
+              CASE p.top.confidence WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 ELSE 3 END,
               p.distinct_finding_types DESC,
               p.services_with_finding / v.visible_services DESC,
               p.company_key) END AS rank,
-          p.ranking_score, p.company_score, p.confidence, p.distinct_finding_types,
+          p.ranking_score, p.company_score, p.top.confidence AS confidence,
+          p.top.route AS confidence_route, p.top.finding_type AS top_finding_type,
+          p.distinct_finding_types,
           p.services_with_finding, v.visible_services,
           p.services_with_finding / v.visible_services AS finding_share,
           p.attributor, p.finding_scorer, p.answers_model

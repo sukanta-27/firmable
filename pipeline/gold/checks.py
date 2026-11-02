@@ -12,6 +12,7 @@ def run(con: duckdb.DuckDBPyConnection, staging: Path) -> tuple[list[Check], dic
     attribution = stage.read(staging, "attribution")
     finding = stage.read(staging, "finding")
     company = stage.read(staging, "company")
+    company_finding = stage.read(staging, "company_finding")
 
     def one(sql: str) -> tuple[int, ...]:
         row = con.execute(sql).fetchone()
@@ -64,6 +65,11 @@ def run(con: duckdb.DuckDBPyConnection, staging: Path) -> tuple[list[Check], dic
         "FILTER (WHERE rank IS NOT NULL), "
         f"count(*) FILTER (WHERE rank IS NOT NULL AND ranking_score IS NULL) FROM {company}"
     )
+    (on_company,) = one(
+        f"SELECT count(*) FROM {finding} f JOIN {attribution} a USING (service_key) "
+        "WHERE a.company_key IS NOT NULL"
+    )
+    (company_finding_rows,) = one(f"SELECT count(*) FROM {company_finding}")
     (answered,) = one("SELECT count(*) FILTER (WHERE status = 'answered') FROM finding_answers")
     checks += [
         Check(
@@ -89,6 +95,13 @@ def run(con: duckdb.DuckDBPyConnection, staging: Path) -> tuple[list[Check], dic
             blocking=True,
             passed=unscored_rank == 0,
             detail=f"{unscored_rank:,} ranked companies without a ranking score",
+        ),
+        Check(
+            name="company_finding_complete",
+            blocking=True,
+            passed=company_finding_rows == on_company,
+            detail=f"{company_finding_rows:,} rows for {on_company:,} findings on services "
+            "with a company",
         ),
         Check(
             name="finding_answers_present",
