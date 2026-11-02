@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="report">
+  <div class="notice">
+    <p><strong>We don't have {{ key }} in the {{ scan.received_at.strftime("%-d %b") }} scan.</strong></p>
+    <p>It may have been in an earlier month's list, or the link was typed wrong.</p>
+    <a role="button" href="/?{{ q }}">Search the leads for "{{ key }}"</a>
+    <a role="button" class="secondary outline" href="/">All leads</a>
+  </div>
+</div>
+{% endblock %}

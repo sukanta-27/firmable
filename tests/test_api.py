@@ -24,6 +24,7 @@ from tests.helpers import run, variant
 RECORDS = (Path(__file__).parent / "fixtures" / "signal_records.jsonl").read_text().splitlines()
 PASSWORD = "correct horse"
 FORMULA = '=HYPERLINK("http://evil.example","Click")'
+MARKUP = "<img src=x onerror=alert(1)>"
 
 
 def record(shodan_id: str, hostname: str | None = None, **changes: object) -> str:
@@ -85,8 +86,16 @@ def scan(tmp_path_factory: pytest.TempPathFactory) -> tuple[Settings, Manifest]:
                 asn="AS64500",
                 org=FORMULA,
             ),  # a company-owned network, named after its scan `org` string
+            variant(
+                next(r for r in RECORDS if '"51215953' in r),
+                12,
+                ip_str="115.243.88.184",
+                ip=1945327800,
+                asn="AS64501",
+                org=MARKUP,
+            ),  # a registry name that is markup: the pages must show it, never run it
         ],
-        networks=[("AS0", ["NSP"]), ("AS64500", ["Enterprise"])],
+        networks=[("AS0", ["NSP"]), ("AS64500", ["Enterprise"]), ("AS64501", ["Enterprise"])],
     )
     asdb = root / "ref" / "asdb" / "as_of=2026-03"
     asdb.mkdir(parents=True)
@@ -305,6 +314,24 @@ def test_unranked_company_comes_last_and_says_why(client: TestClient) -> None:
     divider = "Not ranked yet."
     assert html.count(divider) == 1
     assert html.index(divider) < html.index('href="/companies/thirdco.com?')
+
+
+def test_markup_from_the_scan_is_shown_as_text(client: TestClient) -> None:
+    log_in(client)
+    escaped = "&lt;img src=x onerror=alert(1)&gt;"
+    for path in ("/", "/companies/AS64501"):
+        html = client.get(path).text
+        assert escaped in html, path
+        assert MARKUP not in html, path
+
+
+def test_unranked_company_page_loads(client: TestClient) -> None:
+    log_in(client)
+    response = client.get("/companies/thirdco.com")
+    assert response.status_code == 200
+    for text in ("Not ranked", "Not scored yet", "We found a problem here that we haven&#39;t"):
+        assert text in response.text, text
+    assert ">None<" not in response.text, "a missing value was printed instead of its fallback"
 
 
 def test_csv_cells_cannot_run_as_spreadsheet_formulas(client: TestClient) -> None:

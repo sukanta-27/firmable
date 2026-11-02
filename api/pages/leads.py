@@ -84,14 +84,18 @@ def filter_counts(cur: duckdb.DuckDBPyConnection, scorer: str) -> FilterCounts:
         (n,) = matching(cur, filters, scorer).count("*").fetchall()[0]
         return int(n)
 
-    (ranked,) = matching(cur, Filters(), scorer).filter("rank IS NOT NULL").count("*").fetchall()[0]
     return FilterCounts(
         high=count(Filters(confidence=["High"])),
         could_give_full_control=count(Filters(could_give_full_control=True)),
         attacked_in_the_wild=count(Filters(attacked_in_the_wild=True)),
         already_breached=count(Filters(already_breached=True)),
-        ranked=int(ranked),
+        ranked=ranked_total(cur, scorer),
     )
+
+
+def ranked_total(cur: duckdb.DuckDBPyConnection, scorer: str) -> int:
+    (n,) = matching(cur, Filters(), scorer).filter("rank IS NOT NULL").count("*").fetchall()[0]
+    return int(n)
 
 
 def query_items(request: Request) -> list[tuple[str, str]]:

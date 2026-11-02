@@ -1,0 +1,62 @@
+{% from "_macros.html" import confidence_badge, threat_tags, score_tag %}
+
+{% macro services_table(services, open_proof=False) %}
+<table class="services">
+  <thead><tr><th>Where</th><th>Software</th><th>Reached as</th><th>Country</th><th>Tied to company by</th></tr></thead>
+  <tbody>
+  {% for s in services %}
+    <tr>
+      <td><code class="plain">{{ s.ip }}:{{ s.port }}/{{ s.transport }}</code></td>
+      <td>{{ s.product or "not identified" }} {{ s.version or "" }}</td>
+      <td>{{ s.hostname or "—" }}</td>
+      <td>{{ s.country_code or "—" }}</td>
+      <td>{{ confidence_badge(s.confidence, s.route) }}</td>
+    </tr>
+    <tr>
+      <td colspan="5">
+        {% if s.evidence_text %}
+          <details {% if open_proof %}open{% endif %}>
+            <summary class="small">What the service sent back (proof)</summary>
+            <pre class="evidence">{{ s.evidence_text }}</pre>
+            <button type="button" class="secondary outline copy" data-copy="{{ s.evidence_text }}">Copy proof</button>
+          </details>
+        {% else %}
+          <p class="small muted">The service didn't send back any text we could keep. The address and port are still the proof.</p>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{% macro summary_bar(sm) %}
+<div class="summarybar">
+  <span><strong>Tied by:</strong> {% for k, n in sm.tied %}{{ n | num }} {{ k }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+  <span><strong>Software:</strong> {% for k, n in sm.software %}{{ k }} ({{ n | num }}){% if not loop.last %}, {% endif %}{% endfor %}</span>
+  <span><strong>Countries:</strong> {% for k, n in sm.countries %}{{ k }} {{ n | num }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+</div>
+{% endmacro %}
+
+{% macro finding_block(f, c, open=False, single=False) %}
+<details class="finding" id="finding-{{ f.finding_type }}" {% if open %}open{% endif %}>
+  <summary>
+    {{ score_tag(f.score) }}{{ threat_tags(f) }}
+    <span class="mono muted">{{ f.finding_type }} · {{ f.kind }}</span>
+    <p class="line">{{ f.salesperson_line or UNSCORED_LINE }}</p>
+    <span class="seen">{{ f.services | length | num }} {{ "service" if f.services | length == 1 else "services" }}
+      · seen {{ (f.services | map(attribute="first_seen") | min).strftime("%-d %b") }} – {{ (f.services | map(attribute="last_seen") | max).strftime("%-d %b %Y") }}</span>
+  </summary>
+  {% if f.cve_summary %}
+    <p class="tech"><strong>Technical detail (for their IT team):</strong> {{ f.cve_summary }}</p>
+  {% endif %}
+  {% if f.services | length > services_shown %}
+    {{ summary_bar(summary(f)) }}
+  {% endif %}
+  {{ services_table(f.services[:services_shown], open_proof=single) }}
+  {% if f.services | length > services_shown %}
+    <p class="small">Showing {{ services_shown }} of {{ f.services | length | num }}, the surest first.
+      <a href="/companies/{{ c.company_key | urlencode }}/findings/{{ f.finding_type | urlencode }}?{{ carried }}">See all {{ f.services | length | num }} services →</a></p>
+  {% endif %}
+</details>
+{% endmacro %}

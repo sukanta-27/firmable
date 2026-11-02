@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import confidence_badge, threat_tags %}
+{% from "_finding.html" import finding_block with context %}
+{% block title %}{{ c.company_name or c.company_key }} · Exposure leads{% endblock %}
+{% block content %}
+<div class="report">
+  <p class="back">
+    <a href="{{ back_href }}">← {{ back_label }}</a>
+    <button type="button" class="secondary outline copy" data-copy="{{ request.url }}">Copy page link</button>
+  </p>
+
+  <header class="company-head">
+    <h1>{{ c.company_name or c.company_key }}</h1>
+    {% if c.company_kind == "network" %}
+      <p class="mono muted">{{ c.company_key }} · a network, not a domain</p>
+    {% elif c.company_name and c.company_name != c.company_key %}
+      <p class="mono muted">{{ c.company_key }}</p>
+    {% endif %}
+    <p class="facts">
+      {% if c.rank is none %}<span class="tag">Not ranked</span>{% else %}Rank {{ c.rank | num }} of {{ ranked | num }} · {{ rule | lower }}{% endif %}
+      · {{ c.visible_services | num }} {{ "service" if c.visible_services == 1 else "services" }} seen, {{ c.services_with_finding | num }} with a problem
+      {% if c.countries %}· {{ c.countries[:2] | join(", ") }}{% if c.countries | length > 2 %} + {{ c.countries | length - 2 }} more{% endif %}{% endif %}
+    </p>
+  </header>
+
+  {% set text, why = badge(c.confidence, c.confidence_route) %}
+  <div class="sure">
+    <strong>Are we sure it's them?</strong> {{ confidence_badge(c.confidence, c.confidence_route) }}
+    <details {% if c.confidence != "High" %}open{% endif %}>
+      <summary>Why this confidence?</summary>
+      <p class="small">{{ why }}</p>
+    </details>
+  </div>
+
+  {% set top = c.findings[0] %}
+  <section class="hero" aria-label="Opening line">
+    <div class="kicker">Open with this</div>
+    <p class="opening">{{ top.salesperson_line or UNSCORED_LINE }}</p>
+    <button type="button" class="copy" data-copy="{{ top.salesperson_line or UNSCORED_LINE }}">Copy line</button>
+    {{ threat_tags(top) }}
+    {% if top.finding_type in breach_types %}
+      <p class="caveat"><strong>Signs of a break-in.</strong> Someone appears to have got in already.</p>
+    {% else %}
+      <p class="caveat">This describes the kind of problem. It doesn't mean this company has been attacked.</p>
+    {% endif %}
+  </section>
+
+  <section class="findings">
+    <h2>Everything we found, worst first · {{ c.findings | length }} {{ "problem" if c.findings | length == 1 else "problems" }}</h2>
+    <p class="small muted">Each problem lists where we saw it and what the service sent back.</p>
+    {% for f in shown %}{{ finding_block(f, c, open=loop.first, single=single) }}{% endfor %}
+    {% if folded %}
+      <details class="finding">
+        <summary><strong>+ {{ folded | length }} more</strong>
+          <span class="muted small">· scores {{ folded | map(attribute="score") | reject("none") | min | default("–") }}–{{ folded | map(attribute="score") | reject("none") | max | default("–") }}</span></summary>
+        {% for f in folded %}{{ finding_block(f, c) }}{% endfor %}
+      </details>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
