@@ -28,6 +28,8 @@ class Settings(RefSettings):
     # Required, with no default: the sample is a subset of the full file, so a run that
     # silently picked a shared default root would double-count every sample record.
     data_root: Path
+    # Outside every data root: it holds the one scan the app shows, whichever root it came from.
+    publish_root: Path = Path("data/publish")
     max_empty_share: float = 0.01
     # Distinct port + transport pairs above which an address is labelled answers_everything.
     # 99.9% of non-CDN, non-honeypot addresses answer on 62 or fewer (2026-10-26 file).

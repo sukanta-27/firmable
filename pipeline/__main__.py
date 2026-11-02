@@ -9,6 +9,7 @@ import duckdb
 from pipeline import bronze, eval, gold, silver
 from pipeline.landing import LandingError, land
 from pipeline.meta import Manifest, Status, find_manifest, manifest_path, read_manifest, write_json
+from pipeline.publish import PublishError, publish
 from pipeline.ref import finding_scores, peeringdb, snapshot
 from pipeline.settings import RefSettings, Settings
 
@@ -124,6 +125,21 @@ def run_gold(source: Path, force: bool, start_at: str) -> int:
     return 0
 
 
+def run_publish(source: Path) -> int:
+    settings = Settings()
+    manifest = find_manifest(settings.data_root, source)
+    if manifest is None:
+        logger.error("no manifest for %s under %s", source, settings.data_root)
+        return 1
+    try:
+        target = publish(settings, manifest)
+    except PublishError as e:
+        logger.error("publish refused: %s", e)
+        return 1
+    logger.info("published %s… to %s", manifest.file_id[:12], target)
+    return 0
+
+
 def run_ref_peeringdb() -> int:
     try:
         target, n = peeringdb.fetch(RefSettings().ref_root)
@@ -213,6 +229,8 @@ def main() -> int:
         default=gold.STEP_NAMES[0],
         help="resume a failed run at this step, reusing the outputs of the steps before it",
     )
+    p = sub.add_parser("publish", help="make one file's gold the scan the app shows")
+    p.add_argument("source", type=Path)
     r = sub.add_parser("ref", help="reference data: snapshots and the finding-score answers")
     r_sub = r.add_subparsers(dest="source", required=True)
     r_sub.add_parser("peeringdb", help="fetch today's PeeringDB network types")
@@ -239,6 +257,8 @@ def main() -> int:
         return run_eval_attribution(args.strategy)
     if args.step == "ref":
         return run_ref_peeringdb() if args.source == "peeringdb" else run_finding_scores(args)
+    if args.step == "publish":
+        return run_publish(args.source)
     if args.step == "silver":
         return run_silver(args.source, args.force, args.start_at)
     if args.step == "gold":

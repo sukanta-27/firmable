@@ -1,0 +1,69 @@
+"""Choose which scan the app shows: copy one file's app tables and provenance to one folder.
+
+The app reads nothing else, and the deploy ships only this folder, so the image's code and
+data always travel together.
+"""
+
+import shutil
+from datetime import UTC, datetime
+from pathlib import Path
+
+import duckdb
+from pydantic import BaseModel
+
+from pipeline.meta import Manifest, Status, code_version, manifest_path, write_json
+from pipeline.settings import Settings
+
+TABLES = ("company", "company_finding")
+
+
+class Published(BaseModel):
+    file_id: str
+    data_root: str
+    published_at: datetime
+    code_version: str
+    tables: list[str]
+
+
+class PublishError(Exception):
+    pass
+
+
+def publish(settings: Settings, manifest: Manifest) -> Path:
+    if manifest.status != Status.GOLD or manifest.gold_run_id is None:
+        raise PublishError(f"{manifest.file_id[:12]}… is at {manifest.status}, not gold")
+    target = settings.publish_root
+    # Built beside the target and swapped in at the end: a crash halfway must never leave a
+    # folder holding parts of two scans for a deploy to pick up.
+    building = target.with_name(target.name + ".building")
+    shutil.rmtree(building, ignore_errors=True)
+    building.mkdir(parents=True)
+
+    gold = settings.data_root / "gold"
+    for table in TABLES:
+        source = gold / table / f"file_id={manifest.file_id}" / "*.parquet"
+        duckdb.execute(
+            f"COPY (SELECT * FROM read_parquet('{source}', hive_partitioning=false)) "
+            f"TO '{building / table}.parquet' (FORMAT PARQUET, COMPRESSION ZSTD)"
+        )
+    shutil.copy(manifest_path(settings.data_root, manifest.file_id), building / "manifest.json")
+    run_log = settings.data_root / "_meta" / "run" / f"{manifest.gold_run_id}.json"
+    shutil.copy(run_log, building / "gold_run.json")
+    write_json(
+        building / "publish.json",
+        Published(
+            file_id=manifest.file_id,
+            data_root=str(settings.data_root),
+            published_at=datetime.now(UTC),
+            code_version=code_version(),
+            tables=list(TABLES),
+        ),
+    )
+
+    retired = target.with_name(target.name + ".old")
+    shutil.rmtree(retired, ignore_errors=True)
+    if target.exists():
+        target.rename(retired)
+    building.rename(target)
+    shutil.rmtree(retired, ignore_errors=True)
+    return target
