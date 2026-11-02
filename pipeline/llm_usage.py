@@ -5,7 +5,7 @@ outcome: a refused or cut-off reply is still billed, so a log of successes alone
 under-reports the cost.
 """
 
-import json
+import hashlib
 import statistics
 from datetime import UTC, datetime
 from typing import Literal
@@ -13,6 +13,8 @@ from typing import Literal
 from anthropic.types import Usage
 from pydantic import BaseModel
 
+from api.reports import UsageReport, UsageTotal
+from pipeline.meta import report_stamp, write_json
 from pipeline.settings import RefSettings
 
 type CallKind = Literal["messages", "count_tokens"]
@@ -101,30 +103,6 @@ def record(
     return call
 
 
-class UsageTotal(BaseModel):
-    use_case: str
-    model: str
-    kind: CallKind
-    calls: int
-    failures: int
-    input_tokens: int
-    output_tokens: int
-    cache_write_tokens: int
-    cache_read_tokens: int
-    # The sum over priced calls only, None when none was priced; unpriced_calls says how
-    # many it leaves out.
-    cost_usd: float | None
-    unpriced_calls: int
-    median_seconds: float
-
-
-class UsageReport(BaseModel):
-    command: str
-    generated_at: str
-    log_path: str
-    totals: list[UsageTotal]
-
-
 def summarise(settings: RefSettings) -> UsageReport:
     path = settings.llm_usage_path
     calls = (
@@ -156,12 +134,10 @@ def summarise(settings: RefSettings) -> UsageReport:
         )
         for (use_case, model, kind), rows in sorted(groups.items())
     ]
+    log_hash = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else "none"
     report = UsageReport(
-        command="pipeline ref llm-usage",
-        generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
-        log_path=str(path),
+        stamp=report_stamp("pipeline ref llm-usage", log=str(path), log_sha256=log_hash),
         totals=totals,
     )
-    settings.llm_usage_report.parent.mkdir(parents=True, exist_ok=True)
-    settings.llm_usage_report.write_text(json.dumps(report.model_dump(), indent=1) + "\n")
+    write_json(settings.llm_usage_report, report)
     return report

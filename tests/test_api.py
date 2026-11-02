@@ -1,4 +1,5 @@
 import csv
+import gzip
 import io
 import json
 import re
@@ -13,8 +14,8 @@ from pydantic import SecretStr
 from api.auth import hasher
 from api.main import create_app
 from api.settings import ApiSettings
-from pipeline import gold
-from pipeline.meta import read_manifest
+from pipeline import eval, gold, llm_usage
+from pipeline.meta import Manifest, read_manifest, report_stamp, write_json
 from pipeline.publish import publish
 from pipeline.ref.finding_scores import Answer
 from pipeline.settings import Settings
@@ -58,8 +59,8 @@ def answer(item_id: str, exploitation: str, automatable: str, impact: str) -> st
 
 
 @pytest.fixture(scope="module")
-def published(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A tiny scan through gold and publish, with one company per case the API must handle."""
+def scan(tmp_path_factory: pytest.TempPathFactory) -> tuple[Settings, Manifest]:
+    """A tiny scan through gold, with one company per case the API must handle."""
     root = tmp_path_factory.mktemp("scan")
     smbghost = next(r for r in RECORDS if '"64f41291' in r)
     FTP = next(r for r in RECORDS if '"d27145be' in r)
@@ -107,24 +108,37 @@ def published(tmp_path_factory: pytest.TempPathFactory) -> Path:
         answers_path=answers,
         kev_path=kev,
         publish_root=root / "publish",
+        # Never the repo's own reports: those describe the real scan.
+        eval_root=root / "eval",
+        llm_usage_path=root / "calls.jsonl",
+        llm_usage_report=root / "llm_usage.json",
     )
     log = gold.build(manifest, settings)
     assert not [c for c in log.checks if c.blocking and not c.passed]
     final = read_manifest(settings.data_root, manifest.file_id)
     assert final is not None
-    return publish(settings, final)
+    return settings, final
 
 
-@pytest.fixture
-def client(published: Path) -> Iterator[TestClient]:
+@pytest.fixture(scope="module")
+def published(scan: tuple[Settings, Manifest]) -> Path:
+    return publish(*scan)
+
+
+def app_on(publish_root: Path) -> TestClient:
     settings = ApiSettings(
-        publish_root=published,
+        publish_root=publish_root,
         app_users={"rep": hasher.hash(PASSWORD)},
         session_secret=SecretStr("test secret"),
         cookie_secure=False,
         login_max_failures=3,
     )
-    with TestClient(create_app(settings)) as c:
+    return TestClient(create_app(settings))
+
+
+@pytest.fixture
+def client(published: Path) -> Iterator[TestClient]:
+    with app_on(published) as c:
         yield c
 
 
@@ -247,3 +261,78 @@ def test_company_page_shows_every_finding_gold_has_for_the_company(
     assert unscored["rank"] is None
     assert [f["score"] for f in unscored["findings"]] == [None]
     assert client.get("/api/companies/nobody.example").status_code == 404
+
+
+def test_how_we_know_marks_a_report_never_run_as_not_run(client: TestClient) -> None:
+    log_in(client)
+    page = client.get("/api/how-we-know")
+    assert page.status_code == 200, page.text
+    body = page.json()
+    sections = ("attribution_cases", "finding_scores", "ranking", "llm_usage")
+    assert {body[s]["status"] for s in sections} == {"not_run"}
+    assert body["attribution_coverage"]["metrics"]
+
+
+def test_how_we_know_serves_each_report_as_the_pipeline_wrote_it(
+    scan: tuple[Settings, Manifest], tmp_path: Path
+) -> None:
+    base, manifest = scan
+    epss = tmp_path / "epss.csv.gz"
+    with gzip.open(epss, "wt") as f:
+        f.write("#model_version:t,score_date:t\ncve,epss,percentile\nX,0.5,0.5\n")
+    victims = tmp_path / "ref" / "ransomware_live" / "as_of=2026-10-31" / "victims_2026-10.json"
+    victims.parent.mkdir(parents=True)
+    victims.write_text(json.dumps({"victims": [{"website": "https://www.breached.com/"}]}))
+    settings = base.model_copy(
+        update={
+            "ref_root": tmp_path / "ref",
+            "epss_path": epss,
+            "eval_root": tmp_path / "eval",
+            "llm_usage_path": tmp_path / "calls.jsonl",
+            "llm_usage_report": tmp_path / "llm_usage.json",
+            "publish_root": tmp_path / "publish",
+        }
+    )
+    con = duckdb.connect()
+    eval.load_cases(con, settings.attribution_cases)
+    write_json(
+        settings.eval_root / "attribution.json",
+        eval.score_attribution(con, settings.attributor, report_stamp("test")),
+    )
+    write_json(settings.eval_root / "finding_scores_check.json", eval.check_answers(settings))
+    write_json(
+        eval.ranking_report_path(settings.data_root, manifest.file_id),
+        eval.compare_rankings(settings, manifest.file_id),
+    )
+    llm_usage.record(
+        settings,
+        use_case="u",
+        model="m",
+        kind="count_tokens",
+        outcome="ok",
+        request_id=None,
+        usage=None,
+        input_tokens=5,
+        seconds=1.0,
+        prompt_version="v1",
+        input_hash="h",
+        items=1,
+    )
+    llm_usage.summarise(settings)
+    publish(settings, manifest)
+
+    with app_on(settings.publish_root) as client:
+        log_in(client)
+        body = client.get("/api/how-we-know").json()
+    for section, name in (
+        ("attribution_cases", "attribution"),
+        ("finding_scores", "finding_scores_check"),
+        ("ranking", "ranking"),
+        ("llm_usage", "llm_usage"),
+    ):
+        written = json.loads((settings.publish_root / "eval" / f"{name}.json").read_text())
+        assert (body[section]["status"], body[section]["report"]) == ("ok", written), section
+    # The fixture's breached.com is a victim, so the match above was not compared empty.
+    assert [c["company_key"] for c in body["ranking"]["report"]["victims"]["companies"]] == [
+        "breached.com"
+    ]

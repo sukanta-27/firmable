@@ -1,10 +1,12 @@
 import os
 import subprocess
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel
+
+from api.reports import ReportStamp
 
 
 class Status(StrEnum):
@@ -100,3 +102,9 @@ def code_version() -> str:
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
     return f"{commit}-dirty" if dirty else commit
+
+
+def report_stamp(command: str, **inputs: str) -> ReportStamp:
+    return ReportStamp(
+        command=command, ran_at=datetime.now(UTC), code_version=code_version(), inputs=inputs
+    )

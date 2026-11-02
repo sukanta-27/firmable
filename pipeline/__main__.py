@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import logging
 import sys
@@ -9,7 +10,15 @@ import duckdb
 
 from pipeline import bronze, eval, gold, llm_usage, silver
 from pipeline.landing import LandingError, land
-from pipeline.meta import Manifest, Status, find_manifest, manifest_path, read_manifest, write_json
+from pipeline.meta import (
+    Manifest,
+    Status,
+    find_manifest,
+    manifest_path,
+    read_manifest,
+    report_stamp,
+    write_json,
+)
 from pipeline.publish import PublishError, publish
 from pipeline.ref import finding_scores, peeringdb, snapshot
 from pipeline.settings import RefSettings, Settings
@@ -159,7 +168,9 @@ def run_finding_scores(args: argparse.Namespace) -> int:
         return 0
     settings = RefSettings()
     if args.action == "check":
-        print("\n".join(eval.check_answers(settings)))
+        report = eval.check_answers(settings)
+        print("\n".join(report.lines()))
+        write_json(settings.eval_root / "finding_scores_check.json", report)
         return 0
     if args.action == "import":
         counts = finding_scores.import_answers(settings, args.answers, args.model, "claude_code")
@@ -200,7 +211,9 @@ def run_eval_ranking(source: Path) -> int:
     if manifest is None or manifest.status != Status.GOLD:
         logger.error("%s has no gold under %s; run gold first", source, settings.data_root)
         return 1
-    print("\n".join(eval.compare_rankings(settings, manifest.file_id)))
+    report = eval.compare_rankings(settings, manifest.file_id)
+    print("\n".join(report.lines()))
+    write_json(eval.ranking_report_path(settings.data_root, manifest.file_id), report)
     return 0
 
 
@@ -208,7 +221,16 @@ def run_eval_attribution(strategy: str | None) -> int:
     settings = RefSettings()
     con = duckdb.connect()
     eval.load_cases(con, settings.attribution_cases)
-    report = eval.score_attribution(con, strategy or settings.attributor)
+    strategy = strategy or settings.attributor
+    cases_hash = hashlib.sha256(settings.attribution_cases.read_bytes()).hexdigest()
+    stamp = report_stamp(
+        "pipeline eval attribution",
+        strategy=strategy,
+        cases=str(settings.attribution_cases),
+        cases_sha256=cases_hash,
+    )
+    report = eval.score_attribution(con, strategy, stamp)
+    write_json(settings.eval_root / "attribution.json", report)
     print(f"SYNTHETIC attribution cases, strategy {report.strategy}")
     print(f"{'':34} right missed wrong")
     for name, t in [("TOTAL", report.total), *report.by_case.items()]:

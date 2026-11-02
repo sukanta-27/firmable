@@ -10,6 +10,7 @@ from anthropic.types import Message
 from pipeline import eval, gold, llm_usage
 from pipeline.gold import company
 from pipeline.gold.attribution import attribute
+from pipeline.meta import report_stamp
 from pipeline.ref import finding_scores
 from pipeline.settings import RefSettings, Settings
 from tests.helpers import run, variant
@@ -20,7 +21,7 @@ CASES = Path(__file__).parent / "eval" / "attribution_cases.json"
 def test_synthetic_cases_rules_ab_v1_commits_to() -> None:
     con = duckdb.connect()
     eval.load_cases(con, CASES)
-    report = eval.score_attribution(con, "rules_ab_v1")
+    report = eval.score_attribution(con, "rules_ab_v1", report_stamp("test"))
 
     # Known failures, not asserted: cloud_customer_fleet (a tenant with a landlord's spread is
     # dropped by rule A) and template_directory_name (no rule for generic directory names).
@@ -167,7 +168,7 @@ def test_check_compares_each_model_with_the_one_gold_scores_with(tmp_path: Path)
     ]
     settings.answers_path.write_text("".join(a.model_dump_json() + "\n" for a in rows))
 
-    out = eval.check_answers(settings)
+    out = eval.check_answers(settings).lines()
 
     # Alphabetically haiku sorts before opus, which once made it the reference model.
     assert [line for line in out if line.startswith("\n== agreement")] == [

@@ -11,6 +11,7 @@ from pathlib import Path
 import duckdb
 from pydantic import BaseModel
 
+from pipeline.eval import ranking_report_path
 from pipeline.meta import Manifest, Status, code_version, manifest_path, write_json
 from pipeline.settings import Settings
 
@@ -23,6 +24,7 @@ class Published(BaseModel):
     published_at: datetime
     code_version: str
     tables: list[str]
+    reports: list[str]
 
 
 class PublishError(Exception):
@@ -49,6 +51,19 @@ def publish(settings: Settings, manifest: Manifest) -> Path:
     shutil.copy(manifest_path(settings.data_root, manifest.file_id), building / "manifest.json")
     run_log = settings.data_root / "_meta" / "run" / f"{manifest.gold_run_id}.json"
     shutil.copy(run_log, building / "gold_run.json")
+    # A report never run is left out, and the app shows its section as "not run".
+    reports = {
+        "attribution": settings.eval_root / "attribution.json",
+        "finding_scores_check": settings.eval_root / "finding_scores_check.json",
+        "ranking": ranking_report_path(settings.data_root, manifest.file_id),
+        "llm_usage": settings.llm_usage_report,
+    }
+    (building / "eval").mkdir()
+    copied = []
+    for name, source in reports.items():
+        if source.exists():
+            shutil.copy(source, building / "eval" / f"{name}.json")
+            copied.append(name)
     write_json(
         building / "publish.json",
         Published(
@@ -57,6 +72,7 @@ def publish(settings: Settings, manifest: Manifest) -> Path:
             published_at=datetime.now(UTC),
             code_version=code_version(),
             tables=list(TABLES),
+            reports=copied,
         ),
     )
 

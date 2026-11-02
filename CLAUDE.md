@@ -37,7 +37,7 @@ Before saying work is done: `ruff check`, `mypy` and `pytest` pass, and you ran 
 | Path | What it is | Rule |
 |---|---|---|
 | `pipeline/` | Landing → bronze → silver → gold, and the `pipeline` CLI. Runs on our machine, never on the host | Each stage reads and writes Parquet tables, not Python objects |
-| `api/` | FastAPI app. Reads gold Parquet through DuckDB, read-only | Thin: query, validate, return |
+| `api/` | FastAPI app. Reads gold Parquet through DuckDB, read-only | Thin: query, validate, return. Never imports `pipeline/`, which the deployed image doesn't hold. `api/reports.py` is the eval reports' schema: the pipeline imports it to write them, so it stays plain Pydantic |
 | `web/` | React + Vite frontend, built into static files that `api/` serves | |
 | `tests/` | Tests | See "Tests" below |
 | `docs/` | Findings, each number traceable to a script | Amend in place when wrong; never add a contradicting doc beside it |

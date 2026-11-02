@@ -20,6 +20,9 @@ class RefSettings(BaseSettings):
     ref_root: Path = Path("data/ref")
     attributor: str = "rules_ab_v1"
     attribution_cases: Path = Path("tests/eval/attribution_cases.json")
+    # Reports that need no dataset (attribution cases, finding-score check). The ranking
+    # report depends on one scan, so it is written under that scan's data root instead.
+    eval_root: Path = Path("data/eval")
     # Committed: written only by `pipeline ref finding-scores import`, never by hand.
     answers_path: Path = Path("finding_scores/answers.jsonl")
     # The model whose answers gold scores with; every other model's are a second opinion.

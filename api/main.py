@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from api import auth, companies, company, scan
+from api import auth, companies, company, how_we_know, scan
 from api.settings import ApiSettings
 
 PUBLISHED_TABLES = ("company", "company_finding")
@@ -89,5 +89,6 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     protected.include_router(companies.router)
     protected.include_router(company.router)
     protected.include_router(scan.router)
+    protected.include_router(how_we_know.router)
     app.include_router(protected)
     return app
