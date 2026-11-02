@@ -1,63 +1,69 @@
 {
- "command": "pipeline ref llm-usage",
- "generated_at": "2026-11-02T15:35:02+00:00",
- "log_path": "llm_usage/calls.jsonl",
- "totals": [
-  {
-   "use_case": "finding_scores",
-   "model": "claude-haiku-5-5",
-   "kind": "count_tokens",
-   "calls": 1,
-   "failures": 0,
-   "input_tokens": 19360,
-   "output_tokens": 0,
-   "cache_write_tokens": 0,
-   "cache_read_tokens": 0,
-   "cost_usd": null,
-   "unpriced_calls": 1,
-   "median_seconds": 4.79
+  "stamp": {
+    "command": "pipeline ref llm-usage",
+    "ran_at": "2026-11-02T16:43:32.752545Z",
+    "code_version": "e4359bfedb87a82a1c3026a565b6087458beee24",
+    "inputs": {
+      "log": "llm_usage/calls.jsonl",
+      "log_sha256": "d5936c0edde02954d0672c3aad909ae0cd2f8b17000e4f93305e5090430fe319"
+    }
   },
-  {
-   "use_case": "finding_scores",
-   "model": "claude-haiku-5-5",
-   "kind": "messages",
-   "calls": 1,
-   "failures": 0,
-   "input_tokens": 19360,
-   "output_tokens": 41934,
-   "cache_write_tokens": 0,
-   "cache_read_tokens": 0,
-   "cost_usd": 0.022903,
-   "unpriced_calls": 0,
-   "median_seconds": 181.42
-  },
-  {
-   "use_case": "finding_scores",
-   "model": "claude-opus-5-5",
-   "kind": "count_tokens",
-   "calls": 1,
-   "failures": 0,
-   "input_tokens": 19360,
-   "output_tokens": 0,
-   "cache_write_tokens": 0,
-   "cache_read_tokens": 0,
-   "cost_usd": null,
-   "unpriced_calls": 1,
-   "median_seconds": 8.07
-  },
-  {
-   "use_case": "finding_scores",
-   "model": "claude-sonnet-5-5",
-   "kind": "count_tokens",
-   "calls": 1,
-   "failures": 0,
-   "input_tokens": 19360,
-   "output_tokens": 0,
-   "cache_write_tokens": 0,
-   "cache_read_tokens": 0,
-   "cost_usd": null,
-   "unpriced_calls": 1,
-   "median_seconds": 13.81
-  }
- ]
+  "totals": [
+    {
+      "use_case": "finding_scores",
+      "model": "claude-haiku-5-5",
+      "kind": "count_tokens",
+      "calls": 1,
+      "failures": 0,
+      "input_tokens": 19360,
+      "output_tokens": 0,
+      "cache_write_tokens": 0,
+      "cache_read_tokens": 0,
+      "cost_usd": null,
+      "unpriced_calls": 1,
+      "median_seconds": 4.79
+    },
+    {
+      "use_case": "finding_scores",
+      "model": "claude-haiku-5-5",
+      "kind": "messages",
+      "calls": 1,
+      "failures": 0,
+      "input_tokens": 19360,
+      "output_tokens": 41934,
+      "cache_write_tokens": 0,
+      "cache_read_tokens": 0,
+      "cost_usd": 0.022903,
+      "unpriced_calls": 0,
+      "median_seconds": 181.42
+    },
+    {
+      "use_case": "finding_scores",
+      "model": "claude-opus-5-5",
+      "kind": "count_tokens",
+      "calls": 1,
+      "failures": 0,
+      "input_tokens": 19360,
+      "output_tokens": 0,
+      "cache_write_tokens": 0,
+      "cache_read_tokens": 0,
+      "cost_usd": null,
+      "unpriced_calls": 1,
+      "median_seconds": 8.07
+    },
+    {
+      "use_case": "finding_scores",
+      "model": "claude-sonnet-5-5",
+      "kind": "count_tokens",
+      "calls": 1,
+      "failures": 0,
+      "input_tokens": 19360,
+      "output_tokens": 0,
+      "cache_write_tokens": 0,
+      "cache_read_tokens": 0,
+      "cost_usd": null,
+      "unpriced_calls": 1,
+      "median_seconds": 13.81
+    }
+  ]
 }
