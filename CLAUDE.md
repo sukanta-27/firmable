@@ -19,7 +19,9 @@ Python 3.12, FastAPI, Pydantic v2, pydantic-settings, DuckDB over Parquet. Manag
 | Finding-score prompt | `DATA_ROOT=data/runs/full uv run python -m pipeline ref finding-scores render`, then `… import --answers <reply.json> --model <id>` and `… check` |
 | Attribution on the synthetic cases | `uv run python -m pipeline eval attribution` |
 | Compare the company scorers | `DATA_ROOT=data/runs/full uv run python -m pipeline eval ranking <source>` |
-| Run the API | `uv run fastapi dev api/main.py` |
+| Publish one scan for the app | `DATA_ROOT=data/runs/full uv run python -m pipeline publish <source>` (writes `data/publish/`, all the app reads) |
+| Run the API | `uv run uvicorn api.main:create_app --factory --reload` (reads `APP_USERS`, `SESSION_SECRET` and `COOKIE_SECURE=false` from `.env`) |
+| Add an app user | `uv run python -m api hash-password` |
 | Tests | `uv run pytest` |
 | Lint + format | `uv run ruff check --fix . && uv run ruff format .` |
 | Types | `uv run mypy` (folders listed in `pyproject.toml`) |
@@ -41,7 +43,7 @@ Before saying work is done: `ruff check`, `mypy` and `pytest` pass, and you ran 
 | `data/` | Raw dump, samples, external feeds (KEV, EPSS). Git-ignored | See "Data" below |
 | `finding_scores/` | The AI's validated answers per finding type, which gold scores with. Committed | Written only by `pipeline ref finding-scores import`. Never edited by hand |
 
-`api/` and `web/` don't exist yet. Create modules when the first code needs them, not ahead of it.
+`web/` doesn't exist yet. Create modules when the first code needs them, not ahead of it.
 
 ## Data
 
@@ -100,7 +102,7 @@ def score(con: duckdb.DuckDBPyConnection, signals: str, strategy: str) -> duckdb
 ### Python, FastAPI, Pydantic
 
 - Type everything; `mypy --strict` runs on `pipeline/` and `api/`.
-- Settings in one `pydantic-settings` class read from env. No `os.environ` elsewhere, no hard-coded paths, model ids or weights.
+- Settings in one `pydantic-settings` class per process, read from env: `pipeline/settings.py` and `api/settings.py` (the app has no data root). No `os.environ` elsewhere, no hard-coded paths, model ids or weights.
 - DuckDB is blocking: routes that query it are `def`, not `async def`, so FastAPI runs them in its thread pool.
 - A DuckDB connection is not safe to share across threads. Open one read-only connection at startup and give each request its own `con.cursor()`.
 - Response models are explicit Pydantic models. Don't return DuckDB rows or dicts from routes.
