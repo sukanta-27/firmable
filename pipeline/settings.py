@@ -1,7 +1,15 @@
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr
 from pydantic_settings import BaseSettings
+
+
+class Price(BaseModel):
+    input_per_mtok: float
+    output_per_mtok: float
+    # Haiku 5.5 charges more per token above 100K input tokens; past this the row prices
+    # nothing rather than under-price.
+    up_to_input_tokens: int | None = None
 
 
 class RefSettings(BaseSettings):
@@ -14,8 +22,26 @@ class RefSettings(BaseSettings):
     attribution_cases: Path = Path("tests/eval/attribution_cases.json")
     # Committed: written only by `pipeline ref finding-scores import`, never by hand.
     answers_path: Path = Path("finding_scores/answers.jsonl")
-    # The model whose answers gold scores with; the other model's are the second opinion.
+    # The model whose answers gold scores with; every other model's are a second opinion.
+    # It calls no model, so it is not finding_scores_model: switching gold to another
+    # model's answers re-scores every company and is decided after `check`, not by default.
     answers_model: str = "claude-opus-5-5"
+    # The model `ask` sends the prompt to. The API key works only for Haiku.
+    finding_scores_model: str = "claude-haiku-5-5"
+    # Committed, so a cost quoted in the write-up points at a file in git.
+    llm_usage_path: Path = Path("llm_usage/calls.jsonl")
+    llm_usage_report: Path = Path("llm_usage/summary.json")
+    llm_prices: dict[str, Price] = {
+        "claude-haiku-5-5": Price(
+            input_per_mtok=0.10, output_per_mtok=0.50, up_to_input_tokens=100_000
+        ),
+        "claude-opus-5-5": Price(input_per_mtok=4.00, output_per_mtok=20.00),
+        "claude-sonnet-5-5": Price(input_per_mtok=2.00, output_per_mtok=10.00),
+    }
+    llm_price_source: str = (
+        "claude-api skill model table, cached 2026-10-06; not yet checked on Anthropic's "
+        "pricing page"
+    )
     prompt_version: str = "v1"
     finding_scorer: str = "ssvc_v1"
     kev_path: Path = Path("data/external/kev.json")

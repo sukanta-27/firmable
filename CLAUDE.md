@@ -17,6 +17,8 @@ Python 3.12, FastAPI, Pydantic v2, pydantic-settings, DuckDB over Parquet. Manag
 | Silver for one file | `DATA_ROOT=data/runs/sample uv run python -m pipeline silver data/samples/stride400.jsonl` (same `--from <step>` and `--force`) |
 | Gold for one file | `DATA_ROOT=data/runs/sample uv run python -m pipeline gold data/samples/stride400.jsonl` (same `--from <step>` and `--force`; needs an ASdb snapshot in `data/ref/asdb/as_of=<YYYY-MM>/`, downloaded by hand from asdb.stanford.edu) |
 | Finding-score prompt | `DATA_ROOT=data/runs/full uv run python -m pipeline ref finding-scores render`, then `… import --answers <reply.json> --model <id>` and `… check` |
+| Finding-score answers through the API | `uv run python -m pipeline ref finding-scores ask --render <render folder>` (model from `FINDING_SCORES_MODEL`; `count` instead of `ask` counts input tokens only). Needs `ANTHROPIC_API_KEY` in the environment |
+| LLM cost and token totals | `uv run python -m pipeline ref llm-usage` (also writes `llm_usage/summary.json`) |
 | Attribution on the synthetic cases | `uv run python -m pipeline eval attribution` |
 | Compare the company scorers | `DATA_ROOT=data/runs/full uv run python -m pipeline eval ranking <source>` |
 | Publish one scan for the app | `DATA_ROOT=data/runs/full uv run python -m pipeline publish <source>` (writes `data/publish/`, all the app reads) |
@@ -41,7 +43,8 @@ Before saying work is done: `ruff check`, `mypy` and `pytest` pass, and you ran 
 | `docs/` | Findings, each number traceable to a script | Amend in place when wrong; never add a contradicting doc beside it |
 | `archive/` | Frozen exploration scripts that reproduce the numbers in `docs/` | **Read-only.** Never import from it. Copy what you need into `pipeline/` |
 | `data/` | Raw dump, samples, external feeds (KEV, EPSS). Git-ignored | See "Data" below |
-| `finding_scores/` | The AI's validated answers per finding type, which gold scores with. Committed | Written only by `pipeline ref finding-scores import`. Never edited by hand |
+| `finding_scores/` | The AI's validated answers per finding type, which gold scores with. Committed | Written only by `pipeline ref finding-scores import` or `ask`. Never edited by hand |
+| `llm_usage/` | One row per LLM API call (`calls.jsonl`) and the totals over it. Committed | Append-only; written only by `pipeline/llm_usage.py` |
 
 `web/` doesn't exist yet. Create modules when the first code needs them, not ahead of it.
 
@@ -142,6 +145,9 @@ A finding type with no row is unscored, never guessed.
 - Validate every response against a Pydantic model; anything that fails validation is recorded as unlabelled, never guessed.
 - Before an LLM labeller is used, measure its agreement with an independent source (for network types, PeeringDB). Record the agreement rate, and the tokens and cost per 1,000 items.
 - Model id, prompt and provider come from settings, behind the rule 3 registry.
+- **Each use case reads its model from its own `<USE_CASE>_MODEL` setting,** defaulting to `claude-haiku-5-5`, the only model the API key can call. A new use case adds its variable when it's built.
+- **Every API call writes one row to `llm_usage/calls.jsonl` through `llm_usage.record`, failures included.** A refused or cut-off reply is still billed. No code path calls the Anthropic API without writing its row.
+- A model with no row in the price table (`llm_prices` in `pipeline/settings.py`) gets an empty cost, never a guess.
 
 ## Tests
 

@@ -4,9 +4,10 @@ import logging
 import sys
 from pathlib import Path
 
+import anthropic
 import duckdb
 
-from pipeline import bronze, eval, gold, silver
+from pipeline import bronze, eval, gold, llm_usage, silver
 from pipeline.landing import LandingError, land
 from pipeline.meta import Manifest, Status, find_manifest, manifest_path, read_manifest, write_json
 from pipeline.publish import PublishError, publish
@@ -162,11 +163,34 @@ def run_finding_scores(args: argparse.Namespace) -> int:
         return 0
     if args.action == "import":
         counts = finding_scores.import_answers(settings, args.answers, args.model, "claude_code")
-    else:
-        render_dir = finding_scores.newest_render(settings)
-        reply = finding_scores.ANSWER_PROVIDERS["api"](settings, render_dir, args.model)
-        counts = finding_scores.import_answers(settings, reply, args.model, "api", render_dir)
-    logger.info("imported %s answers: %s", args.model, dict(sorted(counts.items())))
+        logger.info("imported %s answers: %s", args.model, dict(sorted(counts.items())))
+        return 0
+    model = args.model or settings.finding_scores_model
+    try:
+        if args.action == "count":
+            n = finding_scores.count_tokens(settings, args.render, model)
+            logger.info("%s: %s input tokens for %s", model, f"{n:,}", args.render)
+            return 0
+        counts = finding_scores.ask(settings, args.render, model)
+    except (anthropic.APIError, RuntimeError) as e:
+        logger.error("%s failed, logged to %s: %s", model, settings.llm_usage_path, e)
+        return 1
+    logger.info("imported %s answers: %s", model, dict(sorted(counts.items())))
+    return 0
+
+
+def run_llm_usage() -> int:
+    report = llm_usage.summarise(RefSettings())
+    print(f"{'use case':15} {'model':18} {'kind':13} calls fail   input  output   cost$ med_s")
+    for t in report.totals:
+        cost = "not priced" if t.cost_usd is None else f"{t.cost_usd:.4f}"
+        if t.cost_usd is not None and t.unpriced_calls:
+            cost += f" (+{t.unpriced_calls} unpriced)"
+        print(
+            f"{t.use_case:15} {t.model:18} {t.kind:13} {t.calls:5} {t.failures:4} "
+            f"{t.input_tokens:7} {t.output_tokens:7} {cost} {t.median_seconds:.1f}"
+        )
+    logger.info("wrote %s", RefSettings().llm_usage_report)
     return 0
 
 
@@ -242,8 +266,16 @@ def main() -> int:
     fi.add_argument("--answers", type=Path, required=True)
     fi.add_argument("--model", required=True, help="the model that wrote the reply")
     fs_sub.add_parser("check", help="compare the stored answers with KEV, EPSS and each other")
-    fa = fs_sub.add_parser("ask", help="send the newest render through the API (untested)")
-    fa.add_argument("--model", required=True)
+    # --render is required because render skips every type already answered: today's
+    # render can be empty, and sending the newest one would send nothing.
+    for action, text in (
+        ("ask", "send a render through the API, log the call and store the answers"),
+        ("count", "count a render's input tokens for a model through the API, and log it"),
+    ):
+        fa = fs_sub.add_parser(action, help=text)
+        fa.add_argument("--render", type=Path, required=True, help="a folder render wrote")
+        fa.add_argument("--model", help="default: FINDING_SCORES_MODEL")
+    r_sub.add_parser("llm-usage", help="totals over the LLM call log, also written as JSON")
     e = sub.add_parser("eval", help="measure gold against its test sets")
     e_sub = e.add_subparsers(dest="eval_target", required=True)
     ea = e_sub.add_parser("attribution", help="score attribution on the synthetic cases")
@@ -256,6 +288,8 @@ def main() -> int:
     if args.step == "eval":
         return run_eval_attribution(args.strategy)
     if args.step == "ref":
+        if args.source == "llm-usage":
+            return run_llm_usage()
         return run_ref_peeringdb() if args.source == "peeringdb" else run_finding_scores(args)
     if args.step == "publish":
         return run_publish(args.source)

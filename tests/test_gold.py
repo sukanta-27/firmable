@@ -1,13 +1,17 @@
+import gzip
 import json
 from pathlib import Path
 
+import anthropic
 import duckdb
+import pytest
+from anthropic.types import Message
 
-from pipeline import eval, gold
+from pipeline import eval, gold, llm_usage
 from pipeline.gold import company
 from pipeline.gold.attribution import attribute
 from pipeline.ref import finding_scores
-from pipeline.settings import Settings
+from pipeline.settings import RefSettings, Settings
 from tests.helpers import run, variant
 
 CASES = Path(__file__).parent / "eval" / "attribution_cases.json"
@@ -136,6 +140,97 @@ def test_answer_import_keeps_bad_answers_unscored_and_render_stays_blind(tmp_pat
 
     finding_scores.import_answers(settings, reply, "m", "claude_code", render_dir)
     assert settings.answers_path.read_text() == first
+
+
+def test_check_compares_each_model_with_the_one_gold_scores_with(tmp_path: Path) -> None:
+    kev, epss = tmp_path / "kev.json", tmp_path / "epss.csv.gz"
+    kev.write_text(json.dumps({"catalogVersion": "t", "vulnerabilities": [{"cveID": "CVE-1"}]}))
+    with gzip.open(epss, "wt") as f:
+        f.write("#model_version:t,score_date:t\ncve,epss,percentile\nCVE-1,0.9,0.99\n")
+    settings = RefSettings(answers_path=tmp_path / "a.jsonl", kev_path=kev, epss_path=epss)
+    rows = [
+        finding_scores.Answer(
+            item_id=item_id,
+            kind="vulnerability" if item_id.startswith("CVE") else "exposure",
+            status="answered",
+            exploitation=exploitation,
+            automatable="yes",
+            technical_impact="total",
+            model=model,
+            prompt_version=settings.prompt_version,
+            run_via="api",
+            run_date="2026-11-02",
+            input_hash="h",
+        )
+        for model in ("claude-haiku-5-5", "claude-opus-5-5", "claude-sonnet-5-5")
+        for item_id, exploitation in (("CVE-1", "active"), ("rdp_exposed", "active"))
+    ]
+    settings.answers_path.write_text("".join(a.model_dump_json() + "\n" for a in rows))
+
+    out = eval.check_answers(settings)
+
+    # Alphabetically haiku sorts before opus, which once made it the reference model.
+    assert [line for line in out if line.startswith("\n== agreement")] == [
+        "\n== agreement, claude-opus-5-5 vs claude-haiku-5-5, items both answered",
+        "\n== agreement, claude-opus-5-5 vs claude-sonnet-5-5, items both answered",
+    ]
+
+
+def test_a_refused_ask_imports_nothing_but_is_logged_and_costed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refusal = Message.model_validate(
+        {
+            "id": "msg_t",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-haiku-5-5",
+            "content": [],
+            "stop_reason": "refusal",
+            "stop_sequence": None,
+            "usage": {"input_tokens": 12_000, "output_tokens": 300},
+        }
+    )
+
+    class Stream:
+        request_id = "req_t"
+
+        def __enter__(self) -> "Stream":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def get_final_message(self) -> Message:
+            return refusal
+
+    class Client:
+        def __init__(self, **_: object) -> None:
+            self.messages = self
+
+        def stream(self, **_: object) -> Stream:
+            return Stream()
+
+    monkeypatch.setattr(anthropic, "Anthropic", Client)
+    settings = RefSettings(
+        answers_path=tmp_path / "a.jsonl",
+        llm_usage_path=tmp_path / "calls.jsonl",
+        llm_usage_report=tmp_path / "summary.json",
+    )
+    render_dir = tmp_path / "render"
+    render_dir.mkdir()
+    (render_dir / "items.json").write_text(
+        json.dumps([{"item_id": "x", "kind": "exposure", "description": "d", "evidence": []}])
+    )
+    (render_dir / "prompt.md").write_text("p")
+
+    with pytest.raises(RuntimeError, match="refusal"):
+        finding_scores.ask(settings, render_dir, "claude-haiku-5-5")
+
+    assert not settings.answers_path.exists()
+    [total] = llm_usage.summarise(settings).totals
+    assert (total.calls, total.failures, total.unpriced_calls) == (1, 1, 0)
+    assert total.cost_usd == pytest.approx((12_000 * 0.10 + 300 * 0.50) / 1_000_000)
 
 
 def test_ranking_follows_weighted_score_then_confidence_then_breadth_then_share_then_key(

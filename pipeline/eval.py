@@ -156,7 +156,8 @@ def check_answers(settings: RefSettings) -> list[str]:
 
     Reported, never a gate: KEV against the blind exploitation answer, the median EPSS by
     that answer (it should rise from none to poc to active), each question's agreement
-    between the models present, and where exposed RDP lands among exposures.
+    between the model gold scores with and every other model, and where exposed RDP lands
+    among exposures.
     """
     answers = [
         a
@@ -255,8 +256,9 @@ def check_answers(settings: RefSettings) -> list[str]:
         place = next((i for i, (item, _) in enumerate(exposures, 1) if item == "rdp_exposed"), None)
         out.append(f"  rdp_exposed ranks {place} of {len(exposures)} scored exposures")
 
-    if len(models) >= 2:
-        first, second = models[:2]
+    first = settings.answers_model
+    others = [m for m in models if m != first] if first in models else []
+    for second in others:
         out.append(f"\n== agreement, {first} vs {second}, items both answered")
         for question in ("exploitation", "automatable", "technical_impact"):
             same, n = con.execute(

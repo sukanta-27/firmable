@@ -11,6 +11,7 @@ because `check` compares the answers against exactly those.
 import hashlib
 import json
 import re
+import time
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -21,6 +22,7 @@ import anthropic
 import duckdb
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from pipeline import llm_usage
 from pipeline.settings import RefSettings, Settings
 from pipeline.silver.signal_rules import DESCRIPTIONS, RULES
 
@@ -255,24 +257,62 @@ def import_answers(
 
 type AnswerProvider = Callable[[RefSettings, Path, str], Path]
 
+USE_CASE = "finding_scores"
+
+
+def _render_inputs(render_dir: Path) -> tuple[str, int]:
+    items_bytes = (render_dir / "items.json").read_bytes()
+    return hashlib.sha256(items_bytes).hexdigest(), len(json.loads(items_bytes))
+
 
 def anthropic_messages(settings: RefSettings, render_dir: Path, model: str) -> Path:
-    """Send the rendered prompt as one request and save the raw reply beside it. Untested
-    until the owner's smoke test: no agent session may spend on it.
+    """Send the rendered prompt as one request, log it, and save the raw reply beside it.
 
     No server-side refusal fallback: a fallback model's answers would be stored under the
     model asked for. A refusal or a cut-off reply raises, and nothing is imported.
     """
+    input_hash, items = _render_inputs(render_dir)
     key = settings.anthropic_api_key
     client = anthropic.Anthropic(api_key=key.get_secret_value() if key else None)
-    with client.messages.stream(
+    started = time.monotonic()
+    try:
+        with client.messages.stream(
+            model=model,
+            max_tokens=64000,
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
+            messages=[{"role": "user", "content": (render_dir / "prompt.md").read_text()}],
+        ) as stream:
+            message = stream.get_final_message()
+            request_id = stream.request_id
+    except Exception as e:
+        llm_usage.record(
+            settings,
+            use_case=USE_CASE,
+            model=model,
+            kind="messages",
+            outcome=type(e).__name__,
+            request_id=getattr(e, "request_id", None),
+            usage=None,
+            seconds=time.monotonic() - started,
+            prompt_version=settings.prompt_version,
+            input_hash=input_hash,
+            items=items,
+        )
+        raise
+    llm_usage.record(
+        settings,
+        use_case=USE_CASE,
         model=model,
-        max_tokens=64000,
-        thinking={"type": "adaptive"},
-        output_config={"effort": "high"},
-        messages=[{"role": "user", "content": (render_dir / "prompt.md").read_text()}],
-    ) as stream:
-        message = stream.get_final_message()
+        kind="messages",
+        outcome=message.stop_reason or "none",
+        request_id=request_id,
+        usage=message.usage,
+        seconds=time.monotonic() - started,
+        prompt_version=settings.prompt_version,
+        input_hash=input_hash,
+        items=items,
+    )
     if message.stop_reason != "end_turn":
         raise RuntimeError(f"{model} stopped with {message.stop_reason}; nothing imported")
     target = render_dir / f"response_{model}.json"
@@ -281,3 +321,58 @@ def anthropic_messages(settings: RefSettings, render_dir: Path, model: str) -> P
 
 
 ANSWER_PROVIDERS: dict[str, AnswerProvider] = {"api": anthropic_messages}
+
+
+def ask(settings: RefSettings, render_dir: Path, model: str) -> Counter[str]:
+    reply = ANSWER_PROVIDERS["api"](settings, render_dir, model)
+    return import_answers(settings, reply, model, "api", render_dir)
+
+
+def count_tokens(settings: RefSettings, render_dir: Path, model: str) -> int:
+    """The prompt's input tokens for a model, counted by the API with the request `ask` sends.
+
+    Measures what the Claude Code runs read, which logged no tokens. Their output can't be
+    recovered this way, and Haiku's counts can't stand in: the models use different
+    tokenizers.
+    """
+    input_hash, items = _render_inputs(render_dir)
+    key = settings.anthropic_api_key
+    client = anthropic.Anthropic(api_key=key.get_secret_value() if key else None)
+    started = time.monotonic()
+    try:
+        counted = client.messages.count_tokens(
+            model=model,
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
+            messages=[{"role": "user", "content": (render_dir / "prompt.md").read_text()}],
+        )
+    except Exception as e:
+        llm_usage.record(
+            settings,
+            use_case=USE_CASE,
+            model=model,
+            kind="count_tokens",
+            outcome=type(e).__name__,
+            request_id=getattr(e, "request_id", None),
+            usage=None,
+            seconds=time.monotonic() - started,
+            prompt_version=settings.prompt_version,
+            input_hash=input_hash,
+            items=items,
+        )
+        raise
+    llm_usage.record(
+        settings,
+        use_case=USE_CASE,
+        model=model,
+        kind="count_tokens",
+        outcome="ok",
+        request_id=getattr(counted, "_request_id", None),
+        usage=None,
+        input_tokens=counted.input_tokens,
+        seconds=time.monotonic() - started,
+        prompt_version=settings.prompt_version,
+        input_hash=input_hash,
+        items=items,
+    )
+    return counted.input_tokens
