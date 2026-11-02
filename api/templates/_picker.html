@@ -1,0 +1,52 @@
+{% from "_macros.html" import threat_tags %}
+{% macro item(t) %}
+  <label class="pitem">
+    <input type="checkbox" name="finding_type" value="{{ t.finding_type }}" {% if t.finding_type in chosen %}checked{% endif %}>
+    <span>
+      <span class="lbl">{{ problem_label(t) }}</span>
+      <span class="pl" title="{{ t.salesperson_line or '' }}">{{ t.salesperson_line or "Not assessed yet." }}</span>
+      {{ threat_tags(t) }}<span class="mono muted">{{ t.finding_type }}</span>
+      <span class="muted"> · {{ t.companies | num }} {{ "company" if t.companies == 1 else "companies" }} ·
+        {% if t.score is none %}not scored yet{% else %}score {{ t.score }} of 12{% endif %}</span>
+    </span>
+  </label>
+{% endmacro %}
+<legend>Problem{% if chosen %} <span class="muted small">· {{ chosen | length }} chosen</span>{% endif %}</legend>
+<div class="picker">
+  <div class="picker-head">
+    <strong class="small">Choose problems</strong>
+    <button type="button" class="small-btn"
+            hx-get="/problems?view=short" hx-include="#filters" hx-target="#problems">Done</button>
+  </div>
+  <p class="small muted">A company matches if it has any of them. The list updates as you tick.</p>
+  {# Outside the filter form (form="picker-search"), so searching never reaches the list URL;
+     its change event is stopped so the form doesn't reload the list on blur. #}
+  <input type="search" name="pq" form="picker-search" value="{{ pq }}" aria-label="Search problems by what they mean"
+         placeholder="e.g. database, email, password"
+         hx-get="/problems" hx-include="#filters, this" hx-target="#problems"
+         hx-trigger="keyup changed delay:200ms, search" hx-on:change="event.stopPropagation()">
+  <div class="order">
+    <span class="muted">Order:</span>
+    {% for key, label in (("companies", "Most companies"), ("serious", "Most serious")) %}
+      <a href="#" {% if order == key %}aria-current="true"{% endif %}
+         hx-get="/problems?order={{ key }}" hx-include="#filters, [name=pq]" hx-target="#problems">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  {% for c in hidden_chosen %}<input type="hidden" name="finding_type" value="{{ c }}">{% endfor %}
+
+  {% for label, members in groups if members %}
+    <div class="pgroup">
+      <div class="pgh"><span>{{ label }}</span><span class="muted">{{ members | length }}</span></div>
+      {% for t in members[:4] %}{{ item(t) }}{% endfor %}
+      {% if members | length > 4 %}
+        <details class="more">
+          <summary>Show {{ members | length - 4 }} more in this group</summary>
+          {% for t in members[4:] %}{{ item(t) }}{% endfor %}
+        </details>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="small">No problem matches "{{ pq }}".</p>
+  {% endfor %}
+</div>

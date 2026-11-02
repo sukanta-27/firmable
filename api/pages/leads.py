@@ -64,6 +64,21 @@ def problem_label(t: FindingType) -> str:
     return t.salesperson_line[:cut].rstrip(".")
 
 
+def shortlist(types: dict[str, FindingType], chosen: list[str]) -> list[FindingType]:
+    """The five types on the most companies, plus every chosen one, so a chosen type always
+    has its checkbox in the form."""
+    by_reach = sorted(types.values(), key=lambda t: -t.companies)
+    return by_reach[:5] + [t for t in by_reach[5:] if t.finding_type in chosen]
+
+
+SEVERITY_GROUPS = [
+    (3, "Would give an attacker full control"),
+    (2, "Could expose data or give partial access"),
+    (1, "Information only"),
+    (None, "Not yet assessed"),
+]
+
+
 def filter_counts(cur: duckdb.DuckDBPyConnection, scorer: str) -> FilterCounts:
     def count(filters: Filters) -> int:
         (n,) = matching(cur, filters, scorer).count("*").fetchall()[0]
@@ -145,14 +160,60 @@ def leads(
     if request.headers.get("hx-request"):
         return templates.TemplateResponse(request, "_results.html", context)
     settings: ApiSettings = request.app.state.settings
-    by_reach = sorted(types.values(), key=lambda t: -t.companies)
-    shortlist = by_reach[:5] + [t for t in by_reach[5:] if t.finding_type in page.finding_type]
     context |= {
         **page_context(request, user),
         "active": "leads",
         "counts": filter_counts(cur, settings.company_scorer),
         "quick_views": QUICK_VIEWS,
-        "shortlist": shortlist,
+        "shortlist": shortlist(types, page.finding_type),
         "problem_label": problem_label,
+        "total_types": len(types),
     }
     return templates.TemplateResponse(request, "leads.html", context)
+
+
+@router.get("/problems", response_class=HTMLResponse)
+def problems(
+    request: Request,
+    filters: Annotated[Filters, Query()],
+    user: Annotated[str, Depends(page_user)],
+    cur: Annotated[duckdb.DuckDBPyConnection, Depends(cursor)],
+) -> Response:
+    """The Problem fieldset's body: the short list, or the picker over every type."""
+    types = {t.finding_type: t for t in company.finding_types(cur)}
+    chosen = filters.finding_type
+    context: dict[str, object] = {"chosen": chosen, "problem_label": problem_label}
+    if request.query_params.get("view") == "short":
+        context |= {
+            "shortlist": shortlist(types, chosen),
+            "page": filters,
+            "total_types": len(types),
+        }
+        return templates.TemplateResponse(request, "_shortlist.html", context)
+    pq = request.query_params.get("pq", "").strip().lower()
+    order = "serious" if request.query_params.get("order") == "serious" else "companies"
+    found = [
+        t
+        for t in types.values()
+        if not pq
+        or any(
+            pq in s.lower() for s in (problem_label(t), t.salesperson_line or "", t.finding_type)
+        )
+    ]
+    if order == "serious":
+        found.sort(key=lambda t: (-(t.score or 0), -t.companies))
+    else:
+        found.sort(key=lambda t: (-t.companies, -(t.score or 0)))
+    shown = {t.finding_type for t in found}
+    context |= {
+        "groups": [
+            (label, [t for t in found if t.severity == sev]) for sev, label in SEVERITY_GROUPS
+        ],
+        # Chosen types the search hides still have to be submitted with the form, or the
+        # next tick would silently drop them from the filter.
+        "hidden_chosen": [c for c in chosen if c not in shown],
+        "pq": pq,
+        "order": order,
+        "total_types": len(types),
+    }
+    return templates.TemplateResponse(request, "_picker.html", context)
