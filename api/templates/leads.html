@@ -19,21 +19,21 @@
 
     <fieldset>
       <legend>Are we sure it's them?</legend>
-      <label class="ck"><input type="checkbox" name="confidence" value="High"
+      <label class="ck conf-high"><input type="checkbox" name="confidence" value="High"
         {% if "High" in page.confidence %}checked{% endif %}>
         <span>High confidence only</span><span class="cnt">{{ counts.high | num }}</span></label>
     </fieldset>
 
     <fieldset>
       <legend>How serious</legend>
-      <label class="ck"><input type="checkbox" name="could_give_full_control" value="true"
+      <label class="ck sev-full"><input type="checkbox" name="could_give_full_control" value="true"
         {% if page.could_give_full_control %}checked{% endif %}>
         <span>Would give an attacker full control</span><span class="cnt">{{ counts.could_give_full_control | num }}</span></label>
-      <label class="ck"><input type="checkbox" name="attacked_in_the_wild" value="true"
+      <label class="ck sev-attacked"><input type="checkbox" name="attacked_in_the_wild" value="true"
         {% if page.attacked_in_the_wild %}checked{% endif %}>
         <span>Attackers use this kind of hole</span><span class="cnt">{{ counts.attacked_in_the_wild | num }}</span></label>
       <p class="help">About the kind of problem, not an attack on this company.</p>
-      <label class="ck"><input type="checkbox" name="already_breached" value="true"
+      <label class="ck sev-breach"><input type="checkbox" name="already_breached" value="true"
         {% if page.already_breached %}checked{% endif %}>
         <span>Signs of a break-in</span><span class="cnt">{{ counts.already_breached | num }}</span></label>
       <p class="help">Someone has already locked, wiped or tampered with data here.</p>

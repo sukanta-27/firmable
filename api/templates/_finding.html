@@ -39,7 +39,7 @@
 {% endmacro %}
 
 {% macro finding_block(f, c, open=False, single=False) %}
-<details class="finding" id="finding-{{ f.finding_type }}" {% if open %}open{% endif %}>
+<details class="finding sev-{{ f.severity or 'none' }}" id="finding-{{ f.finding_type }}" {% if open %}open{% endif %}>
   <summary>
     {{ score_tag(f.score) }}{{ threat_tags(f) }}
     <span class="mono muted">{{ f.finding_type }} · {{ f.kind }}</span>

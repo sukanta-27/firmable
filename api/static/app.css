@@ -229,3 +229,52 @@ details.finding { border-color: #999999; border-radius: 0; }
 .notrun { border-radius: 0; }
 .site-footer { border-top-color: #999999; }
 .site-footer summary { color: var(--ink); }
+
+/* Colour, kept to two meanings so it never turns into decoration: how sure we are it's the
+   company (green, amber, grey) and how bad the problem is (red, orange, deep red for a
+   break-in). Every text colour clears 4.5:1 on its background, every border 3:1 on white,
+   and each badge or tag also says its meaning in words. */
+:root[data-theme="light"] {
+  --conf-high-fg: #0b5d2a; --conf-high-bg: #dcf3e2; --conf-high-line: #1f8a45;
+  --conf-med-fg: #5c4300;  --conf-med-bg: #fff1bf;  --conf-med-line: #b98900;
+  --conf-low-fg: #3d3d3d;  --conf-low-bg: #ececec;  --conf-low-line: #8a8a8a;
+  --sev-full-fg: #8f1616;  --sev-full-bg: #fde4e2;  --sev-full-line: #c62828;
+  --sev-att-fg: #8a3c00;   --sev-att-bg: #ffead6;   --sev-att-line: #d9640f;
+  --breach: #9b1c1c;
+}
+
+.badge.High { background: var(--conf-high-bg); color: var(--conf-high-fg); border-color: var(--conf-high-line); }
+.badge.Medium { background: var(--conf-med-bg); color: var(--conf-med-fg); border-color: var(--conf-med-line); }
+.badge.Low { background: var(--conf-low-bg); color: var(--conf-low-fg); border-color: var(--conf-low-line); }
+
+.tag.sev-full { background: var(--sev-full-bg); color: var(--sev-full-fg); border-color: var(--sev-full-line); }
+.tag.sev-attacked { background: var(--sev-att-bg); color: var(--sev-att-fg); border-color: var(--sev-att-line); }
+.tag.alarm { background: var(--breach); color: #ffffff; border-color: var(--breach); }
+.tag.score-high { background: var(--sev-full-line); color: #ffffff; border-color: var(--sev-full-line); }
+.tag.score-mid { background: var(--sev-att-bg); color: var(--sev-att-fg); border-color: var(--sev-att-line); }
+.tag.score-low { background: #f0f0f0; color: var(--conf-low-fg); border-color: #888888; }
+
+/* Filter column: a colour bar on each control ties it to the tags it filters for, and a
+   ticked box takes the same colour. */
+.filters label.ck.conf-high, .filters label.ck.sev-full, .filters label.ck.sev-attacked, .filters label.ck.sev-breach {
+  border-left: 4px solid transparent; padding-left: 0.4rem; margin-left: -0.65rem;
+}
+.filters label.ck.conf-high { border-left-color: var(--conf-high-line); }
+.filters label.ck.sev-full { border-left-color: var(--sev-full-line); }
+.filters label.ck.sev-attacked { border-left-color: var(--sev-att-line); }
+.filters label.ck.sev-breach { border-left-color: var(--breach); }
+.filters .conf-high input:checked { background-color: var(--conf-high-line); border-color: var(--conf-high-line); }
+.filters .sev-full input:checked { background-color: var(--sev-full-line); border-color: var(--sev-full-line); }
+.filters .sev-attacked input:checked { background-color: var(--sev-att-line); border-color: var(--sev-att-line); }
+.filters .sev-breach input:checked { background-color: var(--breach); border-color: var(--breach); }
+
+/* Picker groups and finding cards: severity as a left rule */
+.pgh { border-left: 4px solid #888888; }
+.pgh.sev-3 { border-left-color: var(--sev-full-line); background: var(--sev-full-bg); color: var(--sev-full-fg); }
+.pgh.sev-2 { border-left-color: var(--sev-att-line); background: var(--sev-att-bg); color: var(--sev-att-fg); }
+.pgh.sev-1 { border-left-color: #888888; }
+.pgh.sev-none { border-left-style: dashed; }
+details.finding { border-left-width: 4px; }
+details.finding.sev-3 { border-left-color: var(--sev-full-line); }
+details.finding.sev-2 { border-left-color: var(--sev-att-line); }
+details.finding.sev-1 { border-left-color: #888888; }

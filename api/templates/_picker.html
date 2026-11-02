@@ -35,9 +35,9 @@
 
   {% for c in hidden_chosen %}<input type="hidden" name="finding_type" value="{{ c }}">{% endfor %}
 
-  {% for label, members in groups if members %}
+  {% for sev, label, members in groups if members %}
     <div class="pgroup">
-      <div class="pgh"><span>{{ label }}</span><span class="muted">{{ members | length }}</span></div>
+      <div class="pgh sev-{{ sev or 'none' }}"><span>{{ label }}</span><span class="muted">{{ members | length }}</span></div>
       {% for t in members[:4] %}{{ item(t) }}{% endfor %}
       {% if members | length > 4 %}
         <details class="more">

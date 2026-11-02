@@ -8,14 +8,14 @@
     {%- if t.finding_type in ("ransom_note", "tag_compromised") -%}
       <span class="tag alarm">Signs of a break-in</span>
     {%- endif -%}
-    {%- if t.severity == 3 -%}<span class="tag">Would give an attacker full control</span>{%- endif -%}
-    {%- if t.exploitation_final == "active" -%}<span class="tag">Attackers use this kind of hole</span>{%- endif -%}
+    {%- if t.severity == 3 -%}<span class="tag sev-full">Would give an attacker full control</span>{%- endif -%}
+    {%- if t.exploitation_final == "active" -%}<span class="tag sev-attacked">Attackers use this kind of hole</span>{%- endif -%}
   {%- endif -%}
 {%- endmacro %}
 
 {% macro score_tag(score) -%}
   {%- if score is none -%}<span class="tag">Not scored yet</span>
-  {%- else -%}<span class="tag {% if score >= 9 %}score-high{% endif %}">Score {{ score }} of 12</span>
+  {%- else -%}<span class="tag {{ 'score-high' if score >= 9 else 'score-mid' if score >= 5 else 'score-low' }}">Score {{ score }} of 12</span>
   {%- endif -%}
 {%- endmacro %}
 

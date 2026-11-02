@@ -211,7 +211,7 @@ def problems(
     shown = {t.finding_type for t in found}
     context |= {
         "groups": [
-            (label, [t for t in found if t.severity == sev]) for sev, label in SEVERITY_GROUPS
+            (sev, label, [t for t in found if t.severity == sev]) for sev, label in SEVERITY_GROUPS
         ],
         # Chosen types the search hides still have to be submitted with the form, or the
         # next tick would silently drop them from the filter.
