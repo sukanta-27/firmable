@@ -12,7 +12,7 @@ import duckdb
 from pydantic import BaseModel
 
 from pipeline.eval import ranking_report_path
-from pipeline.meta import Manifest, Status, code_version, manifest_path, write_json
+from pipeline.meta import Manifest, Status, code_version, write_json
 from pipeline.settings import Settings
 
 TABLES = ("company", "company_finding")
@@ -48,7 +48,12 @@ def publish(settings: Settings, manifest: Manifest) -> Path:
             f"COPY (SELECT * FROM read_parquet('{source}', hive_partitioning=false)) "
             f"TO '{building / table}.parquet' (FORMAT PARQUET, COMPRESSION ZSTD)"
         )
-    shutil.copy(manifest_path(settings.data_root, manifest.file_id), building / "manifest.json")
+    # The source path is where the file sat on our machine; the published copy ships in a
+    # public image and repo, and the file id already identifies the scan.
+    write_json(
+        building / "manifest.json",
+        manifest.model_copy(update={"source_uri": Path(manifest.source_uri).name}),
+    )
     run_log = settings.data_root / "_meta" / "run" / f"{manifest.gold_run_id}.json"
     shutil.copy(run_log, building / "gold_run.json")
     # A report never run is left out, and the app shows its section as "not run".
