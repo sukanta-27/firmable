@@ -1,0 +1,7 @@
+# Allow-list: the build context is uploaded to Fly's builder, and data/raw/ alone is 17.6 GB.
+*
+!pyproject.toml
+!uv.lock
+!api/
+!data/publish/
+**/__pycache__

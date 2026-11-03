@@ -2,7 +2,7 @@
 
 A sales tool for a cybersecurity vendor. It turns one Shodan scan file (17.6 GB, 14.6 million records) into a ranked list of companies with a security problem visible from the internet. Each company comes with the evidence a salesperson can open the conversation with.
 
-**App:** _link added after deploy_. The login is shared separately.
+**App:** https://firmable.fly.dev. The login is shared separately.
 
 ## What a salesperson gets
 
