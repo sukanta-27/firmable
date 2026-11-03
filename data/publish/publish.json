@@ -1,0 +1,16 @@
+{
+  "file_id": "71cb1991955ae585cdffec54ceb4fd99ec54ccc47cfc5b7778f57ae6dcc5b5b7",
+  "data_root": "data/runs/full",
+  "published_at": "2026-11-02T16:43:48.049434Z",
+  "code_version": "c4326aafbb873ff10b1509201e78390adcc29409",
+  "tables": [
+    "company",
+    "company_finding"
+  ],
+  "reports": [
+    "attribution",
+    "finding_scores_check",
+    "ranking",
+    "llm_usage"
+  ]
+}

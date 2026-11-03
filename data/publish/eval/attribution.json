@@ -1,0 +1,127 @@
+{
+  "stamp": {
+    "command": "pipeline eval attribution",
+    "ran_at": "2026-11-02T16:43:30.270538Z",
+    "code_version": "e4359bfedb87a82a1c3026a565b6087458beee24",
+    "inputs": {
+      "strategy": "rules_ab_v1",
+      "cases": "tests/eval/attribution_cases.json",
+      "cases_sha256": "5ee748ee1623febcb4283c0777d0301b651ff13f621426d025d783dada81abe1"
+    }
+  },
+  "strategy": "rules_ab_v1",
+  "total": {
+    "right": 213,
+    "missed": 40,
+    "wrong": 3
+  },
+  "by_case": {
+    "tenant_on_shared_hosting": {
+      "right": 1,
+      "missed": 0,
+      "wrong": 0
+    },
+    "cloud_rdns_spread": {
+      "right": 50,
+      "missed": 0,
+      "wrong": 0
+    },
+    "cloud_customer_fleet": {
+      "right": 0,
+      "missed": 40,
+      "wrong": 0
+    },
+    "hoster_ntlm_forest": {
+      "right": 40,
+      "missed": 0,
+      "wrong": 0
+    },
+    "tenant_ntlm_on_isp": {
+      "right": 1,
+      "missed": 0,
+      "wrong": 0
+    },
+    "university_own_network": {
+      "right": 40,
+      "missed": 0,
+      "wrong": 0
+    },
+    "company_network_no_domain": {
+      "right": 5,
+      "missed": 0,
+      "wrong": 0
+    },
+    "landlord_declared_enterprise": {
+      "right": 30,
+      "missed": 0,
+      "wrong": 0
+    },
+    "scan_hostname_vs_stale_rdns": {
+      "right": 1,
+      "missed": 0,
+      "wrong": 0
+    },
+    "placeholder_domain": {
+      "right": 20,
+      "missed": 0,
+      "wrong": 0
+    },
+    "home_lines_ip_number_rdns": {
+      "right": 10,
+      "missed": 0,
+      "wrong": 0
+    },
+    "cdn_scanned_by_hostname": {
+      "right": 1,
+      "missed": 0,
+      "wrong": 0
+    },
+    "platform_subdomain": {
+      "right": 1,
+      "missed": 0,
+      "wrong": 0
+    },
+    "virtual_hosting_one_address": {
+      "right": 3,
+      "missed": 0,
+      "wrong": 0
+    },
+    "template_directory_name": {
+      "right": 0,
+      "missed": 0,
+      "wrong": 3
+    },
+    "company_on_unclassified_network": {
+      "right": 9,
+      "missed": 0,
+      "wrong": 0
+    },
+    "small_business_rdns_only": {
+      "right": 1,
+      "missed": 0,
+      "wrong": 0
+    }
+  },
+  "by_confidence": {
+    "High": {
+      "right": 12,
+      "missed": 0,
+      "wrong": 3
+    },
+    "Low": {
+      "right": 1,
+      "missed": 0,
+      "wrong": 0
+    },
+    "Medium": {
+      "right": 49,
+      "missed": 0,
+      "wrong": 0
+    },
+    "unknown": {
+      "right": 151,
+      "missed": 40,
+      "wrong": 0
+    }
+  }
+}

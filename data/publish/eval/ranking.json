@@ -1,0 +1,135 @@
+{
+  "stamp": {
+    "command": "pipeline eval ranking",
+    "ran_at": "2026-11-02T16:43:32.231688Z",
+    "code_version": "e4359bfedb87a82a1c3026a565b6087458beee24",
+    "inputs": {
+      "file_id": "71cb1991955ae585cdffec54ceb4fd99ec54ccc47cfc5b7778f57ae6dcc5b5b7",
+      "ransomware_live_as_of": "2026-10-31"
+    }
+  },
+  "file_id": "71cb1991955ae585cdffec54ceb4fd99ec54ccc47cfc5b7778f57ae6dcc5b5b7",
+  "note": "Illustration, not a measurement.",
+  "scorers": [
+    {
+      "scorer": "sum_x_confidence_v1",
+      "ranked": 8092,
+      "total": 8106
+    },
+    {
+      "scorer": "worst_x_confidence_v1",
+      "ranked": 8092,
+      "total": 8106
+    }
+  ],
+  "first_scorer": "sum_x_confidence_v1",
+  "second_scorer": "worst_x_confidence_v1",
+  "top_100_shared": 12,
+  "biggest_moves": [
+    {
+      "company_key": "ttfaero.com",
+      "company_name": "ttfaero.com",
+      "rank_first": 21,
+      "rank_second": 6976
+    },
+    {
+      "company_key": "subprimedealerservices.com",
+      "company_name": "subprimedealerservices.com",
+      "rank_first": 37,
+      "rank_second": 6983
+    },
+    {
+      "company_key": "AS160",
+      "company_name": "The University of Chicago",
+      "rank_first": 8,
+      "rank_second": 5526
+    },
+    {
+      "company_key": "AS16813",
+      "company_name": "American Museum of Natural History",
+      "rank_first": 80,
+      "rank_second": 5477
+    },
+    {
+      "company_key": "hosting-advantage.com",
+      "company_name": "hosting-advantage.com",
+      "rank_first": 51,
+      "rank_second": 3887
+    },
+    {
+      "company_key": "educationportal24.com",
+      "company_name": "educationportal24.com",
+      "rank_first": 63,
+      "rank_second": 3676
+    },
+    {
+      "company_key": "cdu.edu.au",
+      "company_name": "cdu.edu.au",
+      "rank_first": 1,
+      "rank_second": 3574
+    },
+    {
+      "company_key": "fhsu.edu",
+      "company_name": "fhsu.edu",
+      "rank_first": 29,
+      "rank_second": 3573
+    },
+    {
+      "company_key": "davisdevelopment.info",
+      "company_name": "davisdevelopment.info",
+      "rank_first": 14,
+      "rank_second": 3524
+    },
+    {
+      "company_key": "greenbysites.com",
+      "company_name": "greenbysites.com",
+      "rank_first": 32,
+      "rank_second": 3530
+    }
+  ],
+  "victims": {
+    "source": "Ransomware.live (https://www.ransomware.live)",
+    "as_of": "2026-10-31",
+    "victim_domains": 8676,
+    "matched": 6,
+    "ranked": 6,
+    "companies": [
+      {
+        "company_key": "archive.org",
+        "company_name": "archive.org",
+        "rank_first": 104,
+        "rank_second": 6519
+      },
+      {
+        "company_key": "pertamina.com",
+        "company_name": "pertamina.com",
+        "rank_first": 1403,
+        "rank_second": 635
+      },
+      {
+        "company_key": "hyundai.com",
+        "company_name": "hyundai.com",
+        "rank_first": 1560,
+        "rank_second": 3425
+      },
+      {
+        "company_key": "wednet.edu",
+        "company_name": "wednet.edu",
+        "rank_first": 4034,
+        "rank_second": 6986
+      },
+      {
+        "company_key": "rjwalker.com",
+        "company_name": "rjwalker.com",
+        "rank_first": 7872,
+        "rank_second": 7844
+      },
+      {
+        "company_key": "tp.edu.tw",
+        "company_name": "tp.edu.tw",
+        "rank_first": 8081,
+        "rank_second": 8080
+      }
+    ]
+  }
+}

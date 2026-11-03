@@ -1,0 +1,411 @@
+{
+  "stamp": {
+    "command": "pipeline ref finding-scores check",
+    "ran_at": "2026-11-02T16:43:30.938419Z",
+    "code_version": "e4359bfedb87a82a1c3026a565b6087458beee24",
+    "inputs": {
+      "answers": "finding_scores/answers.jsonl",
+      "answers_sha256": "cdec9ef0b39b677547d721e05127cf4d545d95a23d57f196b8a81b663cad128d",
+      "prompt_version": "v1",
+      "finding_scorer": "ssvc_v1",
+      "kev_catalog_version": "2026.10.27",
+      "epss": "model_version:v2026.06.15,score_date:2026-10-27T12:03:15Z"
+    }
+  },
+  "prompt_version": "v1",
+  "answers_model": "claude-opus-5-5",
+  "kev_catalog_version": "2026.10.27",
+  "epss_version": "model_version:v2026.06.15,score_date:2026-10-27T12:03:15Z",
+  "models": [
+    {
+      "model": "claude-haiku-5-5",
+      "statuses": {
+        "answered": 68
+      },
+      "kev_both": 15,
+      "kev_model_only": 1,
+      "kev_only": 4,
+      "kev_neither": 12,
+      "kev_disagreements": [
+        {
+          "item_id": "CVE-2019-1652",
+          "exploitation": "poc",
+          "on_kev": true
+        },
+        {
+          "item_id": "CVE-2019-1653",
+          "exploitation": "poc",
+          "on_kev": true
+        },
+        {
+          "item_id": "CVE-2020-0796",
+          "exploitation": "poc",
+          "on_kev": true
+        },
+        {
+          "item_id": "CVE-2021-31206",
+          "exploitation": "active",
+          "on_kev": false
+        },
+        {
+          "item_id": "CVE-2023-33246",
+          "exploitation": "poc",
+          "on_kev": true
+        }
+      ],
+      "epss_by_answer": [
+        {
+          "exploitation": "poc",
+          "cves_with_epss": 16,
+          "median_epss": 0.75775
+        },
+        {
+          "exploitation": "active",
+          "cves_with_epss": 16,
+          "median_epss": 0.9998100000000001
+        }
+      ],
+      "rdp_exposed_rank": 11,
+      "scored_exposures": 34
+    },
+    {
+      "model": "claude-opus-5-5",
+      "statuses": {
+        "answered": 66,
+        "unanswerable": 2
+      },
+      "kev_both": 19,
+      "kev_model_only": 2,
+      "kev_only": 0,
+      "kev_neither": 10,
+      "kev_disagreements": [
+        {
+          "item_id": "CVE-2023-23333",
+          "exploitation": "active",
+          "on_kev": false
+        },
+        {
+          "item_id": "CVE-2023-33193",
+          "exploitation": "active",
+          "on_kev": false
+        }
+      ],
+      "epss_by_answer": [
+        {
+          "exploitation": "poc",
+          "cves_with_epss": 10,
+          "median_epss": 0.452415
+        },
+        {
+          "exploitation": "active",
+          "cves_with_epss": 21,
+          "median_epss": 0.99876
+        }
+      ],
+      "rdp_exposed_rank": 9,
+      "scored_exposures": 33
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "statuses": {
+        "answered": 68
+      },
+      "kev_both": 18,
+      "kev_model_only": 1,
+      "kev_only": 1,
+      "kev_neither": 12,
+      "kev_disagreements": [
+        {
+          "item_id": "CVE-2020-0796",
+          "exploitation": "poc",
+          "on_kev": true
+        },
+        {
+          "item_id": "CVE-2023-23333",
+          "exploitation": "active",
+          "on_kev": false
+        }
+      ],
+      "epss_by_answer": [
+        {
+          "exploitation": "none",
+          "cves_with_epss": 5,
+          "median_epss": 0.01699
+        },
+        {
+          "exploitation": "poc",
+          "cves_with_epss": 8,
+          "median_epss": 0.75775
+        },
+        {
+          "exploitation": "active",
+          "cves_with_epss": 19,
+          "median_epss": 0.99876
+        }
+      ],
+      "rdp_exposed_rank": 11,
+      "scored_exposures": 34
+    }
+  ],
+  "agreement": [
+    {
+      "reference": "claude-opus-5-5",
+      "other": "claude-haiku-5-5",
+      "questions": [
+        {
+          "question": "exploitation",
+          "agree": 58,
+          "both_answered": 66,
+          "disagreements": [
+            {
+              "item_id": "CVE-2019-1652",
+              "reference": "active",
+              "other": "poc"
+            },
+            {
+              "item_id": "CVE-2019-1653",
+              "reference": "active",
+              "other": "poc"
+            },
+            {
+              "item_id": "CVE-2020-0796",
+              "reference": "active",
+              "other": "poc"
+            },
+            {
+              "item_id": "CVE-2023-23333",
+              "reference": "active",
+              "other": "poc"
+            },
+            {
+              "item_id": "CVE-2023-33193",
+              "reference": "active",
+              "other": "poc"
+            },
+            {
+              "item_id": "CVE-2023-33246",
+              "reference": "active",
+              "other": "poc"
+            },
+            {
+              "item_id": "atg_inventory",
+              "reference": "active",
+              "other": "poc"
+            },
+            {
+              "item_id": "ftp_anonymous",
+              "reference": "active",
+              "other": "poc"
+            }
+          ]
+        },
+        {
+          "question": "automatable",
+          "agree": 64,
+          "both_answered": 66,
+          "disagreements": [
+            {
+              "item_id": "CVE-2013-1899",
+              "reference": "yes",
+              "other": "no"
+            },
+            {
+              "item_id": "CVE-2023-22497",
+              "reference": "no",
+              "other": "yes"
+            }
+          ]
+        },
+        {
+          "question": "technical_impact",
+          "agree": 57,
+          "both_answered": 66,
+          "disagreements": [
+            {
+              "item_id": "CVE-2015-1635",
+              "reference": "partial",
+              "other": "total"
+            },
+            {
+              "item_id": "CVE-2019-11510",
+              "reference": "total",
+              "other": "partial"
+            },
+            {
+              "item_id": "CVE-2021-31207",
+              "reference": "total",
+              "other": "partial"
+            },
+            {
+              "item_id": "CVE-2023-33246",
+              "reference": "total",
+              "other": "partial"
+            },
+            {
+              "item_id": "MS15-034",
+              "reference": "partial",
+              "other": "total"
+            },
+            {
+              "item_id": "atg_inventory",
+              "reference": "partial",
+              "other": "information"
+            },
+            {
+              "item_id": "docker_registry_open",
+              "reference": "partial",
+              "other": "total"
+            },
+            {
+              "item_id": "smb_v1",
+              "reference": "partial",
+              "other": "total"
+            },
+            {
+              "item_id": "tls_weak_key",
+              "reference": "partial",
+              "other": "information"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "reference": "claude-opus-5-5",
+      "other": "claude-sonnet-5-5",
+      "questions": [
+        {
+          "question": "exploitation",
+          "agree": 59,
+          "both_answered": 66,
+          "disagreements": [
+            {
+              "item_id": "CVE-2020-0796",
+              "reference": "active",
+              "other": "poc"
+            },
+            {
+              "item_id": "CVE-2023-22496",
+              "reference": "poc",
+              "other": "none"
+            },
+            {
+              "item_id": "CVE-2023-22497",
+              "reference": "poc",
+              "other": "none"
+            },
+            {
+              "item_id": "CVE-2023-33193",
+              "reference": "active",
+              "other": "none"
+            },
+            {
+              "item_id": "CVE-2023-48702",
+              "reference": "poc",
+              "other": "none"
+            },
+            {
+              "item_id": "ipmi_exposed",
+              "reference": "poc",
+              "other": "active"
+            },
+            {
+              "item_id": "node_exporter_open",
+              "reference": "poc",
+              "other": "none"
+            }
+          ]
+        },
+        {
+          "question": "automatable",
+          "agree": 59,
+          "both_answered": 66,
+          "disagreements": [
+            {
+              "item_id": "CVE-2013-1899",
+              "reference": "yes",
+              "other": "no"
+            },
+            {
+              "item_id": "CVE-2021-26857",
+              "reference": "no",
+              "other": "yes"
+            },
+            {
+              "item_id": "CVE-2021-26858",
+              "reference": "no",
+              "other": "yes"
+            },
+            {
+              "item_id": "CVE-2021-27065",
+              "reference": "no",
+              "other": "yes"
+            },
+            {
+              "item_id": "CVE-2021-31207",
+              "reference": "no",
+              "other": "yes"
+            },
+            {
+              "item_id": "CVE-2021-34523",
+              "reference": "no",
+              "other": "yes"
+            },
+            {
+              "item_id": "CVE-2023-33193",
+              "reference": "yes",
+              "other": "no"
+            }
+          ]
+        },
+        {
+          "question": "technical_impact",
+          "agree": 58,
+          "both_answered": 66,
+          "disagreements": [
+            {
+              "item_id": "CVE-2021-31207",
+              "reference": "total",
+              "other": "partial"
+            },
+            {
+              "item_id": "CVE-2021-34523",
+              "reference": "total",
+              "other": "partial"
+            },
+            {
+              "item_id": "CVE-2021-43798",
+              "reference": "partial",
+              "other": "total"
+            },
+            {
+              "item_id": "CVE-2023-33193",
+              "reference": "total",
+              "other": "partial"
+            },
+            {
+              "item_id": "CVE-2024-23897",
+              "reference": "partial",
+              "other": "total"
+            },
+            {
+              "item_id": "tag_database",
+              "reference": "total",
+              "other": "partial"
+            },
+            {
+              "item_id": "tag_eol_os",
+              "reference": "information",
+              "other": "partial"
+            },
+            {
+              "item_id": "tls_weak_key",
+              "reference": "partial",
+              "other": "information"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

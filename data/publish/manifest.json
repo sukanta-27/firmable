@@ -1,0 +1,22 @@
+{
+  "file_id": "71cb1991955ae585cdffec54ceb4fd99ec54ccc47cfc5b7778f57ae6dcc5b5b7",
+  "source_uri": "/Users/sukantaroy/interviews/caseStudies/firmable/data/raw/b2_download_file_by_id",
+  "size_bytes": 17619943483,
+  "compression": "zstd",
+  "received_at": "2026-10-29T22:13:24.852967Z",
+  "lines": 14608407,
+  "landing_seconds": 130.60013103485107,
+  "status": "gold",
+  "records": 14608406,
+  "unreadable": 1,
+  "unknown_keys": {
+    "screenshot.hash": 3301,
+    "screenshot.labels": 3301,
+    "screenshot.text": 2248
+  },
+  "error": null,
+  "silver_run_id": "814ad33644044ee7a91ab5adab83004c",
+  "silver_code_version": "0d5a7cb8cde6a5002ce4fb45d3760306ceea0ea7-dirty",
+  "gold_run_id": "e72c4becaf7d4beb8d48284624b8a2bc",
+  "gold_code_version": "720d146a40a55735a8ec477688313b5dc0cef753"
+}
