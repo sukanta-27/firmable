@@ -1,6 +1,6 @@
 {
   "file_id": "71cb1991955ae585cdffec54ceb4fd99ec54ccc47cfc5b7778f57ae6dcc5b5b7",
-  "source_uri": "/Users/sukantaroy/interviews/caseStudies/firmable/data/raw/b2_download_file_by_id",
+  "source_uri": "b2_download_file_by_id",
   "size_bytes": 17619943483,
   "compression": "zstd",
   "received_at": "2026-10-29T22:13:24.852967Z",
