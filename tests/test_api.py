@@ -156,7 +156,7 @@ def log_in(client: TestClient) -> None:
     assert response.status_code == 204
 
 
-PUBLIC = {"/api/health", "/api/auth/login", "/api/auth/logout", "/login", "/logout"}
+PUBLIC = {"/api/health", "/api/auth/login", "/api/auth/logout", "/login", "/logout", "/writeup"}
 
 
 def test_every_page_and_data_route_refuses_a_request_without_a_session(

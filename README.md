@@ -4,6 +4,8 @@ A sales tool for a cybersecurity vendor. It turns one Shodan scan file (17.6 GB,
 
 **App:** https://firmable.fly.dev. The login is shared separately.
 
+**Write-up:** https://firmable.fly.dev/writeup, no login needed. The pipeline, schema, scoring, evaluation and the production path on one page.
+
 ## What a salesperson gets
 
 - **A ranked list of 8,092 companies,** worst problem first. Filters: "High confidence only", "Would give an attacker full control", "Attackers use this kind of hole", "Signs of a break-in", by problem type, and a search. Exports to CSV.
