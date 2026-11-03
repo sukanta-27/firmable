@@ -41,15 +41,12 @@ class RefSettings(BaseSettings):
         "claude-opus-5-5": Price(input_per_mtok=4.00, output_per_mtok=20.00),
         "claude-sonnet-5-5": Price(input_per_mtok=2.00, output_per_mtok=10.00),
     }
-    llm_price_source: str = (
-        "claude-api skill model table, cached 2026-10-06; not yet checked on Anthropic's "
-        "pricing page"
-    )
+    llm_price_source: str = "https://claude.com/pricing, checked 2026-11-03"
     prompt_version: str = "v1"
     finding_scorer: str = "ssvc_v1"
     kev_path: Path = Path("data/external/kev.json")
     epss_path: Path = Path("data/external/epss_scores-current.csv.gz")
-    # Only the untested `ask` command uses it; None lets the SDK find its own credentials.
+    # Read from ANTHROPIC_API_KEY in the environment; this class doesn't load `.env`.
     anthropic_api_key: SecretStr | None = None
 
 

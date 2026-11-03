@@ -2,7 +2,7 @@
 
 Sales intelligence for a cybersecurity vendor: turn monthly Shodan banner dumps into a ranked list of companies that need security help now, each with the evidence a salesperson can open with. The brief is `README.md`. What the data actually contains, measured, is in `docs/`.
 
-**Read before touching signals or scoring:** `docs/eda/patterns.md` §7 (noise traps) and `docs/terms.md` Part 2. Most plausible rules on this data are wrong, and those two pages say which.
+**Read before touching signals or scoring:** `docs/eda/blind-analysis.md` §1–§3 (signals, rejected candidates, traps tested) and `docs/terms.md`. Most plausible rules on this data are wrong, and those two pages say which.
 
 ## Stack and commands
 
@@ -112,14 +112,14 @@ def score(con: duckdb.DuckDBPyConnection, signals: str, strategy: str) -> duckdb
 
 ## Domain rules that are easy to get wrong
 
-Each was a plausible rule the data disproved. Evidence and counts: `docs/eda/patterns.md` §7.
+Each was a plausible rule the data disproved. Evidence and counts: `docs/eda/blind-analysis.md` §2–§3.
 
 | Trap | Rule |
 |---|---|
 | CVE list on a record | Mostly inferred from the version string. **Only `verified` CVEs are evidence.** Never rank by CVE count |
 | `kev` flag | Means "this version once had an exploited flaw". Use only with `verified`, or to catch same-day KEV additions |
 | CDN-tagged records | Describe the CDN, not the customer. Excluded from exposure signals |
-| Honeypot-tagged records | Dropped from every signal |
+| Honeypot-tagged records | Dropped from every signal. Not enough on its own: untagged fleets (cloned MACs, templated device ids, one API answering on many ports) are filtered per rule in `pipeline/silver/signal_rules.py` |
 | `_shodan.module` (probe name) | Not the service. Use `product` and protocol objects |
 | `org` / `isp` | Usually the hoster or carrier, not the company. Classify the owner first, then attribute |
 | Hostname domain | Often ISP reverse DNS. Filter infrastructure domains computed from the file: IP-like hostnames (`179-125-1-1.provider.net`) and the dominant domain of ISP and hosting networks |
@@ -145,7 +145,7 @@ A finding type with no row is unscored, never guessed.
 - Validate every response against a Pydantic model; anything that fails validation is recorded as unlabelled, never guessed.
 - Before an LLM labeller is used, measure its agreement with an independent source (for network types, PeeringDB). Record the agreement rate, and the tokens and cost per 1,000 items.
 - Model id, prompt and provider come from settings, behind the rule 3 registry.
-- **Each use case reads its model from its own `<USE_CASE>_MODEL` setting,** defaulting to `claude-haiku-5-5`, the only model the API key can call. A new use case adds its variable when it's built.
+- **Each use case reads its model from its own `<USE_CASE>_MODEL` setting,** defaulting to `claude-haiku-5-5`. A new use case adds its variable when it's built.
 - **Every API call writes one row to `llm_usage/calls.jsonl` through `llm_usage.record`, failures included.** A refused or cut-off reply is still billed. No code path calls the Anthropic API without writing its row.
 - A model with no row in the price table (`llm_prices` in `pipeline/settings.py`) gets an empty cost, never a guess.
 

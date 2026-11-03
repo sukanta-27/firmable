@@ -11,6 +11,7 @@ because `check` compares the answers against exactly those.
 import hashlib
 import json
 import re
+import shutil
 import time
 from collections import Counter
 from collections.abc import Callable
@@ -326,6 +327,40 @@ ANSWER_PROVIDERS: dict[str, AnswerProvider] = {"api": anthropic_messages}
 def ask(settings: RefSettings, render_dir: Path, model: str) -> Counter[str]:
     reply = ANSWER_PROVIDERS["api"](settings, render_dir, model)
     return import_answers(settings, reply, model, "api", render_dir)
+
+
+def _fingerprint(paths: list[Path]) -> dict[Path, str]:
+    return {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths if p.is_file()}
+
+
+def measure(settings: RefSettings, render_dir: Path, model: str) -> Path:
+    """Send a render through the API only to log its tokens and cost; store no answers.
+
+    The provider writes its reply beside the prompt it sent, so the prompt is sent from a copy
+    under `measure/`, outside every folder `newest_render` or an import reads. The answers file
+    and the source render are fingerprinted around the call, and any change fails the run,
+    because gold scores from exactly those files.
+    """
+    target = (
+        settings.ref_root
+        / "finding_scores"
+        / "measure"
+        / f"prompt_{settings.prompt_version}"
+        / render_dir.name
+    )
+    target.mkdir(parents=True, exist_ok=True)
+    for name in ("prompt.md", "items.json"):
+        shutil.copyfile(render_dir / name, target / name)
+    before = _fingerprint([settings.answers_path, *render_dir.rglob("*")])
+    try:
+        return ANSWER_PROVIDERS["api"](settings, target, model)
+    finally:
+        after = _fingerprint([settings.answers_path, *render_dir.rglob("*")])
+        changed = sorted(
+            str(p) for p in before.keys() | after.keys() if before.get(p) != after.get(p)
+        )
+        if changed:
+            raise RuntimeError(f"measure changed files gold depends on: {changed}")
 
 
 def count_tokens(settings: RefSettings, render_dir: Path, model: str) -> int:

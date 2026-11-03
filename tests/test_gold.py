@@ -234,6 +234,85 @@ def test_a_refused_ask_imports_nothing_but_is_logged_and_costed(
     assert total.cost_usd == pytest.approx((12_000 * 0.10 + 300 * 0.50) / 1_000_000)
 
 
+def _measure_setup(tmp_path: Path) -> tuple[RefSettings, Path]:
+    settings = RefSettings(
+        ref_root=tmp_path / "ref",
+        answers_path=tmp_path / "answers.jsonl",
+        llm_usage_path=tmp_path / "calls.jsonl",
+        llm_usage_report=tmp_path / "summary.json",
+    )
+    settings.answers_path.write_text('{"item_id": "x", "model": "claude-opus-5-5"}\n')
+    render_dir = settings.ref_root / "finding_scores" / "prompt_v1" / "2026-11-01"
+    render_dir.mkdir(parents=True)
+    (render_dir / "items.json").write_text("[]")
+    (render_dir / "prompt.md").write_text("p")
+    (render_dir / "response_claude-opus-5-5.json").write_text("the reply gold was built from")
+    return settings, render_dir
+
+
+def test_measure_logs_the_call_and_leaves_answers_and_render_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reply = Message.model_validate(
+        {
+            "id": "msg_t",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-opus-5-5",
+            "content": [{"type": "text", "text": "[]"}],
+            "stop_reason": "end_turn",
+            "stop_sequence": None,
+            "usage": {"input_tokens": 19_360, "output_tokens": 40_000},
+        }
+    )
+
+    class Stream:
+        request_id = "req_t"
+
+        def __enter__(self) -> "Stream":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def get_final_message(self) -> Message:
+            return reply
+
+    class Client:
+        def __init__(self, **_: object) -> None:
+            self.messages = self
+
+        def stream(self, **_: object) -> Stream:
+            return Stream()
+
+    monkeypatch.setattr(anthropic, "Anthropic", Client)
+    settings, render_dir = _measure_setup(tmp_path)
+    before = {p: p.read_bytes() for p in [settings.answers_path, *render_dir.iterdir()]}
+
+    kept = finding_scores.measure(settings, render_dir, "claude-opus-5-5")
+
+    assert {p: p.read_bytes() for p in [settings.answers_path, *render_dir.iterdir()]} == before
+    assert render_dir not in kept.parents
+    assert finding_scores.newest_render(settings) == render_dir
+    [total] = llm_usage.summarise(settings).totals
+    assert (total.model, total.calls, total.output_tokens) == ("claude-opus-5-5", 1, 40_000)
+
+
+def test_measure_fails_if_anything_touches_the_answers_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings, render_dir = _measure_setup(tmp_path)
+
+    def provider_that_writes_answers(s: RefSettings, render: Path, model: str) -> Path:
+        s.answers_path.write_text("overwritten")
+        return render / "reply.json"
+
+    monkeypatch.setitem(finding_scores.ANSWER_PROVIDERS, "api", provider_that_writes_answers)
+
+    with pytest.raises(RuntimeError, match=r"answers\.jsonl"):
+        finding_scores.measure(settings, render_dir, "claude-opus-5-5")
+
+
 def test_ranking_follows_weighted_score_then_confidence_then_breadth_then_share_then_key(
     tmp_path: Path,
 ) -> None:

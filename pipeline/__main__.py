@@ -182,6 +182,10 @@ def run_finding_scores(args: argparse.Namespace) -> int:
             n = finding_scores.count_tokens(settings, args.render, model)
             logger.info("%s: %s input tokens for %s", model, f"{n:,}", args.render)
             return 0
+        if args.action == "measure":
+            reply = finding_scores.measure(settings, args.render, model)
+            logger.info("%s: logged to %s, reply kept at %s", model, settings.llm_usage_path, reply)
+            return 0
         counts = finding_scores.ask(settings, args.render, model)
     except (anthropic.APIError, RuntimeError) as e:
         logger.error("%s failed, logged to %s: %s", model, settings.llm_usage_path, e)
@@ -293,6 +297,7 @@ def main() -> int:
     for action, text in (
         ("ask", "send a render through the API, log the call and store the answers"),
         ("count", "count a render's input tokens for a model through the API, and log it"),
+        ("measure", "send a render through the API to log its tokens and cost; stores nothing"),
     ):
         fa = fs_sub.add_parser(action, help=text)
         fa.add_argument("--render", type=Path, required=True, help="a folder render wrote")

@@ -11,3 +11,5 @@ archive/data/
 .claude/context_ledger.md
 .claude/handoff/
 .env
+archive/blind-analysis/cache/
+archive/blind-analysis/out/

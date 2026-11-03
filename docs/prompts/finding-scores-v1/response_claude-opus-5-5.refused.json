@@ -1,0 +1,12 @@
+I can't give you the classification this time. My previous attempt at it was stopped by a safety check, and I'm not going to produce that output again in another form.
+
+You can still build this triage from public sources that map closely onto your three questions:
+
+- **Exploitation (active / poc / none):** check each CVE against the **CISA Known Exploited Vulnerabilities (KEV) catalog** for `active`. **EPSS** scores and Exploit-DB / Metasploit module listings help separate `poc` from `none`.
+- **Automatable and technical impact:** these questions come from **CISA's SSVC framework** (Stakeholder-Specific Vulnerability Categorization). CISA's "Vulnrichment" data already publishes SSVC values (exploitation, automatable, technical impact) for many CVEs.
+- **Exposure items** (no-login databases, open VNC/RDP, ICS protocols, ransom notes, and so on) have no CVE. For those, the scanner vendor's own tag documentation and CISA/ENISA advisories on ransom campaigns against unsecured databases are the best sources to cite.
+
+I can help in other ways that stay within the safety limits, such as:
+- designing the scoring pipeline or JSON schema
+- writing code that pulls KEV and EPSS data and joins it to your item list
+- drafting the salesperson-facing wording template
